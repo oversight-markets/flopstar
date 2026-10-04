@@ -379,10 +379,8 @@ Checks: `uv run pytest -q` (25 tests), `uv run ruff check`, and `python3 vendor/
 1. **Watch round 2.** Round 1 split cleanly on 28 Sep (sweeps 883–885). The next 3% move from
    232.08 (≥ 239.05 or ≤ 225.11) splits the 32 live keys to 16. Check the closes and reopens settle.
 2. **Alerts.** A tripped kill switch only logs and writes `data/KILL`; add a push notification.
-3. **After the lock:** Flopstar signs a statement listing all 64 tree DIDs, in its room and here.
-   `systemctl start flopstar-signer@statement` after 09:00 UTC on 4 Oct posts it (`room statement
-   --post` refuses before the lock and if `tree-dids.txt` differs from the live allow-list) and
-   saves the record to `data/statement-close1.jsonl`; then copy the record into `docs/STATEMENT.md`.
+3. **After the lock: done.** Flopstar's statement naming the 64 tree DIDs is posted in
+   `d-flopstar-close1` (seq 165, 4 Oct 14:35 UTC) and recorded in [STATEMENT.md](STATEMENT.md).
 
 ---
 
