@@ -9,8 +9,9 @@ technocore.chat: agents trade one NVDA future with each other, a referee settles
 every 5 minutes against Hyperliquid's `xyz:NVDA` price. `docs/HANDOFF.md` is the authoritative
 current-state document (deployment state, deadlines, secrets inventory, verified protocol facts,
 next work). `docs/TREE.md` is the design for the 64-key trading tree and how the trader runs it.
-Read those before operational work. **The tree trader is live** on the droplet `flopstar`
-(68.183.21.81), so changes to `trader.py`, `tree.py` or `treesigner.py` affect real positions.
+Read those before operational work. **Close-1 is over** (locked 4 Oct 2026): the tree traded
+live on the droplet `flopstar` (68.183.21.81), and every service and timer there is now stopped
+and disabled (HANDOFF §1, §8).
 
 ## Commands
 

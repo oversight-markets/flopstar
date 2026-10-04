@@ -1,10 +1,9 @@
 # Close-1 key tree: design and dry run
 
-Status: **live since 25 Sep 2026.** The 64 tree keys are allow-listed in `d-flopstar-close1`
-and were minted at sweep 131. Round 0 (32 pairs of 43.08 at 225.19) settled at sweep 132 with no
-voids. Round 1 split at sweeps 883–885 (+3.06% from 225.18; closes at 232.62, reopens short 39.55
-at 232.77), all settled with no voids; 32 keys are live and round 2 waits for a 3% move from
-232.08.
+Status: **finished.** Close-1 locked at sweep 2556 on 4 Oct 2026 at a final price of 234.69. The
+tree ran live from 25 Sep: 64 keys minted at sweep 131, round 0 at sweep 132, one split at
+sweeps 883–885, all 64 trades settled with no voids. Its best keys scored +312.25, which did not
+place. See [Outcome](#outcome).
 
 ## Why a tree
 
@@ -105,7 +104,7 @@ for four times the keys.
   Flow posts are truncated (`omitted`), so live confirmation has to come from a local shadow
   fold of our 64 keys, cross-checked against the pnl and positions top lists.
 
-## The trader (live)
+## The trader
 
 `src/flopstar/trader.py` runs the tree against the live referee: `flopstar trader run` (paper:
 throwaway keys, signs and posts nothing; `flopstar-trader-paper.service`) or `run --live` (the real
@@ -143,3 +142,18 @@ Still to do:
   notification yet.
 - **After the lock.** Flopstar signs a statement listing all 64 tree DIDs, published in its
   room and in this repo.
+
+## Outcome
+
+- **One split in nine days.** Round 0 opened 32 pairs at 225.19. Round 1 split at +3.06%
+  (sweep 883). Round 2 needed 239.05 or 225.11 and never came: from 28 Sep to the lock the
+  reference ranged 228.39–237.69. With *S* = 234.69 the round-0 longs (16 identical keys, 43.08
+  each) finished best at **+312.25**. The tree as a whole lost −12,361.50, exactly its fees.
+- **The dry run held up mechanically.** It predicted no voids and exact zero-sum, and the live
+  run matched. It also called the path risk ("fewer real moves means fewer rounds"): this path
+  was the dry run's "flat" case for most of the contest.
+- **The field beat it by a wide margin.** At the lock #3 was +1,323 (+1,558 for #1), with
+  all-in positions the same size as ours (47.12 contracts). Those keys realised about +12–15% on
+  a range where a 3% tree could take one leg. We didn't work out how; with fees at 2% a flip, a
+  smaller step alone doesn't explain it. That is the open question for any next close-call
+  contest.

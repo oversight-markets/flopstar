@@ -1,31 +1,36 @@
-# Flopstar Handoff: running on a dedicated droplet
+# Flopstar Handoff: close-1 concluded, services wound down
 
 **Project**: Flopstar, an agent for FLOP Labs' Close Call contest (`close-1`) on technocore.chat
 **Repository**: https://github.com/subloop-xyz/flopstar (private)
 **Written**: 25 September 2026, 15:40 UTC; **updated 25 September 2026, 23:05 UTC** after the move; **28 September 2026, 19:50 UTC** after
-the round-1 split
+the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down
 **Host**: droplet `flopstar` (68.183.21.81), running only Flopstar
 **Previous host**: `hoodwatch` (167.99.238.68): decommissioned for Flopstar on 25 Sep; its repo
 clone was deleted and its copies of the key and seed shredded (owner-confirmed)
 
-The droplet move (§3) and the room setup (§4) are done, and the tree trader is live. §3 stays as
-the runbook for rebuilding the droplet. Section 2 is the only place where a mistake can't be
-undone.
+**Close-1 is over.** Trading locked at sweep 2556 (4 Oct 09:00 UTC) and the final price is in.
+Flopstar didn't place: its best keys scored +312.25 against about +1,340 for 3rd. The statement
+naming the 64 tree keys is posted ([STATEMENT.md](STATEMENT.md)), and every service and timer is
+stopped and disabled. The keys, credentials and data are all still on the droplet; what to do with
+them is the owner's call (§8). §3 stays as the runbook for rebuilding the droplet. Section 2 is
+the only place where a mistake can't be undone.
 
 ---
 
-## 1. State (28 Sep 2026, 19:50 UTC)
+## 1. State (4 Oct 2026, 14:45 UTC): final
 
 | Item | State |
 |---|---|
-| Referee monitor | `flopstar-monitor.service` on the droplet. All five referee rooms complete from seq 1, no gaps, every record signature-verified. |
-| Flopstar owner key | On the droplet at `/etc/flopstar/keys/flopstar.pem`; the passphrase is an encrypted credential. `flopstar-signer@verify` matches `did:key:z6MkjLpUAGLtNieLnCFQoUScwJxAKwo5PHZcHRsdyiCJG5Bv`. |
-| Flopstar close-1 registration | Posted in `close1`, seq 548523, 15:14:12 UTC; evidence in `data/registration-close1.jsonl`. |
-| Own room `d-flopstar-close1` | Claimed; first message 22:28:53 UTC; registered in `close1` (seq 1039625, evidence in `data/registration-room.jsonl`); **listed by the referee at sweep 126**. Heartbeat (6 h) and reclaim (4 d) timers on; the claim was last rewritten 22:29:38 UTC, so it lapses only if no rewrite happens by 2 Oct 22:29 UTC. |
-| Allow-list | The 64 tree DIDs, written by Flopstar at 22:48:51 UTC (3,647 of 8,192 characters). |
-| Key tree | 64 keys registered in our room at 22:52 UTC, **minted at sweep 131**. |
-| Tree trader | **Live** (`flopstar-trader.service`). Round 0 (32 pairs, 43.08 each at 225.19) settled at sweep 132 with no voids. **Round 1 split done**: +3.06% from 225.18 at sweep 883 (round open 232.08); 16 closes at 232.62 (sweep 884) and 16 reopens, short 39.55 at 232.77 (sweep 885), all settled with no voids. 32 keys live (16 stayers long 43.08, 16 flippers short 39.55); 64 trades in all. Round 2 triggers at ±3% from 232.08 (≥ 239.05 or ≤ 225.11). The paper trader matches. |
-| Paper trader | `flopstar-trader-paper.service`: the same engine on throwaway keys, posting nothing, for comparison. |
+| Contest | **Concluded.** Lock at sweep 2556 (09:00:29 UTC posts); final price *S* = **234.69**, the `xyz:NVDA` trade at 09:59:40.596 UTC (`d-close1-price` `final` post, 10:00:15 UTC). 18,790,926 owners and 80 rooms at the lock. |
+| Result | **No place.** Best keys **+312.25** (the 16 round-0 longs, 43.08 each from 225.19). Worst key −533.43; tree total −12,361.50, exactly its fees. Referee pnl top list at the lock (marked 234.31): #1 1,558.46, #3 1,323.44, #25 1,161.03; none of ours in the top 25. The official standings would be in `d-close1-results`, which the monitor never read. |
+| Tree | Round 0 (32 pairs, 43.08 each at 225.19, sweep 132) and the **round 1 split** (+3.06% at sweep 883; closes at 232.62, reopens short 39.55 at 232.77, sweeps 884–885). **Round 2 never triggered**: NVDA stayed between 225.11 and 239.05 from 28 Sep to the lock (high 237.69). 64 trades in all, every one settled, no voids, kill switch never tripped. The paper trader matched throughout. |
+| Statement | Posted by Flopstar in `d-flopstar-close1`, **seq 165**, 14:35:11 UTC: the 64 tree DIDs in index order with their sha256. Signature and content verified; record in `data/statement-close1.jsonl` and [STATEMENT.md](STATEMENT.md). |
+| Services | **All stopped and disabled** at 14:40 UTC (`systemctl disable --now`): `flopstar-monitor`, `flopstar-trader`, `flopstar-trader-paper`, `flopstar-heartbeat.timer`, `flopstar-reclaim.timer`. Unit files stay in `/etc/systemd/system`. Nothing on the droplet signs or reads technocore.chat any more. |
+| Referee store | `data/flopstar.db` holds all five referee rooms complete from seq 1 to the lock (price to seq 2558, with the final post), no gaps, every record signature-verified. |
+| Own room `d-flopstar-close1` | Still owned by Flopstar (claim rewritten 3 Oct 22:30 UTC); last write is the statement. With the keepalive off, technocore.chat deletes the room and its notes after 7 days with no write, so **about 11 Oct**. The repo copy of the statement is the durable one. |
+| Flopstar owner key | Unchanged: `/etc/flopstar/keys/flopstar.pem` plus the passphrase credential on the droplet, and the Mac copy. DID `did:key:z6MkjLpUAGLtNieLnCFQoUScwJxAKwo5PHZcHRsdyiCJG5Bv`. |
+| Tree seed | Unchanged: the droplet credential and the owner's offline backup. |
+| Data | `/var/lib/flopstar/data`: referee DB, trader states, signature logs, registration and statement evidence. Not in git. |
 | Secrets hook | Enabled in both clones (`/root/var/www/flopstar`, `/opt/flopstar`). |
 
 ### Why a dedicated droplet
@@ -216,13 +221,18 @@ and a lost claim can never be retaken.
 | 22:52 | 64 tree `owner` posts, minted at sweep 131 | `systemctl start flopstar-tree-register` |
 | 22:57 | Round 0 posted; settled at sweep 132 | `systemctl enable --now flopstar-trader` |
 | 28 Sep 13:36 | Round 1 split: closes settled at sweep 884, reopens (13:41) at sweep 885 | the trader, unattended |
+| 3 Oct 22:30 | Last claim rewrite | `flopstar-reclaim.timer` |
+| 4 Oct 09:00 | Lock (sweep 2556); final price 234.69 posted 10:00:15 | the referee |
+| 4 Oct 14:35 | Statement naming the 64 tree keys (seq 165) | `systemctl start flopstar-signer@statement` |
+| 4 Oct 14:40 | Wind-down: all services and timers stopped and disabled | `systemctl disable --now …` |
 
 **Don't run `claim` again**: it would stop with "already has an owner note". If `room status`
 ever doesn't show Flopstar as the owner, **stop**: the claim has lapsed or been taken, so post
 nothing in the room.
 
-**Claim deadline.** A note with no write for 7 days is deleted. `flopstar-reclaim.timer` rewrites
-it every 4 days (last: 22:29:38 on 25 Sep). Check `systemctl list-timers 'flopstar-*'` if in doubt.
+**Claim deadline.** A note with no write for 7 days is deleted. `flopstar-reclaim.timer` rewrote
+it every 4 days until the wind-down (last: 22:30:12 on 3 Oct). Both timers are now disabled, so
+the room and its notes lapse around 11 Oct.
 
 **Keepalive.**
 - **Why:** notes and rooms with no write for 7 days are deleted, and a room with a single message
@@ -319,7 +329,7 @@ src/flopstar/
 ├── monitor.py     referee monitor: long-poll price, backfill gaps, sync the other rooms
 ├── signer.py      encrypted key loading, did derivation, PolicySigner
 ├── register.py    Flopstar's close-1 owner registration
-├── room.py        own room: status | verify | claim | register | allow | heartbeat | reclaim
+├── room.py        own room: status | verify | claim | register | allow | heartbeat | reclaim | statement
 ├── evidence.py    save our exact signed records from the room export
 ├── tree.py        key tree: HKDF derivation, sizing, round/split engine
 ├── dryrun.py      tree against the vendored fold over simulated paths
@@ -348,12 +358,13 @@ vendor/close-call/ challenge package at 66c1da3. Never edit it.
 | `flopstar trader run --live` / `status --live` | run: yes | seed (`data/trader.json`) |
 | `flopstar trader register [--post]` | only with `--post` | seed (done; re-running skips registered keys) |
 
-Units (in `/etc/systemd/system`, copied from `deploy/`):
+Units (in `/etc/systemd/system`, copied from `deploy/`). Since the wind-down all of them are
+stopped and disabled:
 
 | Unit | Does | Credential |
 |---|---|---|
 | `flopstar-monitor.service` | referee monitor | none |
-| `flopstar-signer@<action>.service` | one `room <action> --post` (heartbeat, reclaim, register, allow, verify) | passphrase |
+| `flopstar-signer@<action>.service` | one `room <action> --post` (heartbeat, reclaim, register, allow, statement, verify) | passphrase |
 | `flopstar-heartbeat.timer` / `flopstar-reclaim.timer` | keepalive every 6 h / claim rewrite every 4 d | – |
 | `flopstar-tree-register.service` | one `trader register --post` | seed |
 | `flopstar-trader.service` | the live trader | seed |
@@ -370,21 +381,48 @@ systemctl restart flopstar-trader flopstar-trader-paper    # state is saved; the
 Environment variables: `FLOPSTAR_KEY_PATH`, `FLOPSTAR_PASSPHRASE_FILE`, `FLOPSTAR_DATA_DIR`,
 `FLOPSTAR_TREE_SEED_PATH`.
 
-Checks: `uv run pytest -q` (25 tests), `uv run ruff check`, and `python3 vendor/close-call/scripts/verify.py`.
+Checks: `uv run pytest -q` (29 tests), `uv run ruff check`, and `python3 vendor/close-call/scripts/verify.py`.
 
 ---
 
-## 8. Next work, in order
+## 8. After close-1: what's left
 
-1. **Watch round 2.** Round 1 split cleanly on 28 Sep (sweeps 883–885). The next 3% move from
-   232.08 (≥ 239.05 or ≤ 225.11) splits the 32 live keys to 16. Check the closes and reopens settle.
-2. **Alerts.** A tripped kill switch only logs and writes `data/KILL`; add a push notification.
-3. **After the lock: done.** Flopstar's statement naming the 64 tree DIDs is posted in
-   `d-flopstar-close1` (seq 165, 4 Oct 14:35 UTC) and recorded in [STATEMENT.md](STATEMENT.md).
+The contest work is done:
+- round 0 and round 1 traded and settled;
+- the statement is posted and recorded;
+- the services are wound down.
+
+The rest is optional, and the owner decides:
+
+1. **Secrets on the droplet.** The owner key (with its passphrase credential) and the tree seed
+   credential are still there.
+   - The tree seed has no further use; shred `/etc/flopstar/creds/close1-master-seed.cred` once the
+     offline backup is confirmed, or keep it if the tree keys might be reused.
+   - The Flopstar key is the agent's identity for future FLOP Labs contests, so keep the Mac copy.
+     Remove the droplet copy (`flopstar.pem` and `flopstar-passphrase.cred`) if the droplet is
+     retired.
+2. **Data.** Archive `/var/lib/flopstar/data` (about 30 MB) off the droplet before retiring it.
+   The registration and statement evidence can't be rebuilt once the rooms expire.
+3. **The droplet itself.** With nothing running it can be powered off or destroyed after 1–2.
+4. **Official results.** `d-close1-results` (reserved in `contest.json`) should hold the final
+   standings. Read it once if a confirmed final score is wanted; our own +312.25 comes from the
+   shadow fold at *S*.
+5. **Lessons for a next contest** (see TREE.md "Outcome"):
+   - The 3% tree got only one split in 9 days: NVDA's reference ranged 223.01–237.69.
+   - The leaders realised about +12–15% on that range, with all-in positions sized like ours
+     (47.12 contracts). We never worked out how; that is the first thing to study before
+     another close-call contest.
+   - A kill-switch alert (it only wrote `data/KILL`) was never built; it never tripped.
+
+To restart anything (e.g. the monitor, to read `d-close1-results`):
+`systemctl enable --now flopstar-monitor`.
 
 ---
 
 ## 9. Operations
+
+Kept for reference; since the wind-down nothing is running, and the commands that read live state
+need the monitor (for the DB) or the network.
 
 ```bash
 systemctl status flopstar-monitor flopstar-trader; journalctl -u 'flopstar-*' -n 50
