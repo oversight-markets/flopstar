@@ -332,6 +332,11 @@ ciphertext and hashes.
    on the host) or `npx`, which resolves the CLI's `^`-ranged dependencies at run time (not pinned
    by FLOP's package). Prefer Docker, pinned by digest, on a host with nothing else valuable, or a
    rootless Docker/Podman setup.
+   **Memory:** on 2026-11-01 the 1 GB droplet (no swap at the time) hard-reset while an uncapped
+   CLI container ran `--version`. It now has a 2 GiB swap file, and every CLI container runs with
+   `--memory 640m --memory-swap 1g --pids-limit 256` (`inference.DOCKER_LIMITS`), so a runaway CLI
+   is killed inside its cgroup. If the CLI needs more than that, resize the droplet rather than
+   raise the cap.
 10. `session run` puts the prompt on the command line (it has no stdin or file option). The task
     runner refuses prompts that contain secrets, and our logs record only the prompt's length. But
     other local users can read argv via `ps`, so the droplet should stay single-tenant.

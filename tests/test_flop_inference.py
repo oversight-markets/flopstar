@@ -107,6 +107,10 @@ def test_cli_prefix_needs_a_runtime(tmp_path, monkeypatch):
     assert prefix[-1].endswith("@sha256:c8f3456c48d41cec9d0229d1e1dd9eb8d6247a22f350c51078d85f129601bbbd")
     assert keystore == "/keys/spend.json" and version == "v0.1.220"
     assert f"{cfg.keystore_path.parent}:/keys:ro" in prefix
+    # Memory, swap and process caps come before the image name.
+    limits = prefix[:prefix.index(prefix[-1])]
+    for flag, value in (("--memory", "640m"), ("--memory-swap", "1g"), ("--pids-limit", "256")):
+        assert limits[limits.index(flag) + 1] == value
 
 
 # ---- direct route end to end with a fake CLI ----------------------------------------------------

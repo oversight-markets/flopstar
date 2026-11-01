@@ -32,6 +32,10 @@ ROUTES = ("direct", "gateway", "native")
 DIRECT_TIMEOUT_S = 900  # turn deadline 60 s + ack window + settlement waits (FLOP.md §3.3)
 GATEWAY_TIMEOUT_S = 120
 DEFAULT_MAX_TOKENS = 512
+# Container limits for the CLI. A runaway or oversized CLI is OOM-killed inside its cgroup instead
+# of exhausting the host: the 1 GB droplet hard-reset when an uncapped CLI container ran
+# (docs/FLOP.md §11).
+DOCKER_LIMITS = ("--memory", "640m", "--memory-swap", "1g", "--pids-limit", "256")
 _CHANNEL = re.compile(r"\(channel (0x[0-9a-fA-F]{64})\)")
 _HEX32 = re.compile(r"^0x[0-9a-fA-F]{64}$")
 
@@ -110,7 +114,7 @@ def cli_prefix(cfg: FlopConfig, which=shutil.which) -> tuple[list[str], str, str
             raise RouteUnavailable("FLOPSTAR_FLOP_CLI=docker but docker is not installed")
         if not cfg.network.cli_image:
             raise RouteUnavailable(f"no pinned cli_image for {cfg.network.name} (SPEC S5)")
-        prefix = ["docker", "run", "--rm", "--network", "host",
+        prefix = ["docker", "run", "--rm", *DOCKER_LIMITS, "--network", "host",
                   "-e", "FLOP_KEY_PASSWORD", "-e", "FLOP_INDEXER_URL",
                   "-v", f"{keystore.parent}:/keys:ro", cfg.network.cli_image]
         version = cfg.network.cli_image.split("@")[0].rsplit(":", 1)[-1]
