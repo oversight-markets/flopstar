@@ -1,17 +1,25 @@
 # Flopstar
 
-Technocore Close Call contest agent for the "close-1" season.
+Oversight's agent for the FLOP ecosystem: it played FLOP Labs' Close Call contest (`close-1`,
+concluded) and is now being built to buy verifiable inference on the FLOP Network.
 
 ## Overview
 
-Flopstar is a Python agent for participating in the FLOP Labs "Close Call" trading contest - a bet on NVIDIA's price on Hyperliquid at a fixed moment. The contest runs from September 25 to October 4, 2026.
+Flopstar is a Python agent with a did:key identity, policy-gated signing, read-only monitoring
+and append-only evidence logs. It has two jobs:
 
-This implementation includes:
-- **Phase 1 (Complete)**: Security hygiene - private key isolation, .gitignore, pre-commit hooks
-- **Phase 2 (Complete)**: Project setup with vendored challenge code
-- **Phase 3 (Complete)**: Read-only monitor for contest data
-- **Phase 4 (Live since 25 Sep 2026)**: Own room `d-flopstar-close1` and a 64-key tree trader,
-  running on a dedicated droplet. Current state: [docs/HANDOFF.md](docs/HANDOFF.md)
+1. **Close Call contest (`close-1`, 25 Sep – 4 Oct 2026, concluded).** A bet on NVIDIA's price on
+   Hyperliquid at a fixed moment, played on technocore.chat with a read-only referee monitor, its
+   own room `d-flopstar-close1` and a 64-key tree trader. Trading locked on 4 Oct; Flopstar didn't
+   place (best keys +312.25 against about +1,340 for 3rd). The statement naming the tree keys is in
+   [docs/STATEMENT.md](docs/STATEMENT.md), and every contest service is stopped.
+2. **FLOP agent (Nov 2026, parked for testnet).** Buys useful inference on the FLOP Network, keeps
+   a verifiable record of every purchase and reports it to Touchstone, Oversight's verification
+   service. It is built and deployed against devnet, and waits for FLOP's testnet (target
+   3 Nov 2026) before spending anything. See [FLOP Agent](#flop-agent).
+
+Current operational state for both: [docs/HANDOFF.md](docs/HANDOFF.md) (§1 for the contest, §10
+for the FLOP agent).
 
 ## Security First
 
@@ -22,6 +30,9 @@ Security measures:
 - Multi-layer .gitignore protection
 - Pre-commit hook blocks any file containing "PRIVATE KEY"
 - No key is ever committed, even in the initial commit
+- On the droplet, passphrases and the tree seed exist only as systemd encrypted credentials
+- The FLOP agent never uses the owner key: it pays from a separate, capped spend account whose
+  keystore is encrypted and whose passphrase is a systemd credential
 
 ## Setup
 
@@ -104,6 +115,60 @@ the referee's posts, and steps the tree once inside a safe posting window. Any v
 or mismatch writes `data/KILL`, after which it signs nothing until the file is removed. On the
 droplet it runs as `flopstar-trader.service` (live) and `flopstar-trader-paper.service`.
 
+## FLOP Agent
+
+`src/flopstar/flop/` makes Flopstar a FLOP Network agent. The design, every protocol fact with its
+source, the open questions and the go-live sequence are in [docs/FLOP.md](docs/FLOP.md).
+
+**Key design.** The Flopstar owner key does nothing on FLOP. A separate sr25519 **spend account**
+(encrypted Polkadot JSON keystore) pays inference escrow. Its small faucet-funded balance and the
+policy's caps bound what a bug could spend.
+
+**How it buys inference** (one interface, three routes):
+- **direct**, preferred: the pinned `flop session run` CLI (container pinned by digest, memory-capped)
+  opens a channel with a named miner. The FLOP SDK verifies every receipt before paying, and the
+  result is recorded as `sdk_verified`.
+- **gateway**: FLOP's OpenAI-style API with a bounded API key. Convenient but `unverified`.
+- **native**: not available. The Python SDK has no inference-request flow.
+
+**Safety rules**
+- **Dry run by default:** every command that signs, spends or sends does nothing without `--post`.
+- **One gate:** only `FlopPolicy` may sign or launch the signing CLI. It allowlists action kinds
+  and on-chain calls, checks caps against the ledger in the same transaction that records a spend
+  (per request, per day, per hour, model allowlist, same-control miner blocklist), and verifies the
+  chain's genesis against the pinned one.
+- **Kill switch:** `data/KILL-flop` stops every FLOP action. It trips on cap breaches, verification
+  failures, mismatches and unexpected errors, and only a human removes it.
+- **Append-only ledger:** every spend and faucet draw is in SQLite tables whose history SQLite
+  triggers protect from rewrites; every signature is logged.
+- **Exact amounts:** FLOP has 18 decimals. Amounts are integer base units or decimal strings, never
+  floats.
+- **Untrusted output:** inference replies are files for humans, never executed, posted or used to
+  sign, and inputs containing key material are refused.
+- **Touchstone reporting:** request/response bytes are encrypted before they leave the server,
+  failed reports buffer and replay in order, and plain HTTP is allowed only on a private network.
+
+**Commands**
+
+```bash
+uv run flopstar flop config                  # network profile, caps, paths (read-only)
+uv run flopstar flop status                  # chain identity, health, spend balance, budget
+uv run flopstar flop wallet setup [--post]   # create the encrypted spend keystore
+uv run flopstar flop faucet [--post]         # draw from the network faucet
+uv run flopstar flop ask --model M --prompt TEXT --purpose NAME [--route direct|gateway] [--post]
+uv run flopstar flop run [--post]            # useful-work tasks: contest-digest, ops-review,
+                                             # research-notes (spend only when there is input)
+uv run flopstar flop recovery [--post]       # recover escrow from our own stuck channels
+uv run flopstar flop touchstone status|check|register|replay
+```
+
+Configuration: `FLOPSTAR_FLOP_CONFIG` (TOML, example `deploy/flop.example.toml`, every cap
+explicit) and `FLOPSTAR_FLOP_NETWORK` (`devnet` | `testnet`); devnet earns nothing.
+
+**Status (1 Nov 2026).** Deployed on the droplet against devnet with a spend account and no funds
+yet (the faucet's per-IP budget refused the first draw). Nothing spends: there are no published
+miner endpoints or gateway keys yet, and testnet isn't live. Details: HANDOFF §10.
+
 ## Investigation: Flow Room Data
 
 **Question**: Do `d-close1-flow` posts list per-trade-id outcomes (settled/void + reason), or only counts?
@@ -136,11 +201,26 @@ src/flopstar/
 ├── treecli.py        - Tree commands: init | dids | dryrun
 ├── treesigner.py     - Tree-key signing, policy-checked and logged
 ├── hyperliquid.py    - Latest xyz:NVDA trade, for pricing the tree's trades
-└── trader.py         - Tree trader: shadow fold, referee reconciliation, posting, kill switch
+├── trader.py         - Tree trader: shadow fold, referee reconciliation, posting, kill switch
+└── flop/             - FLOP agent
+    ├── config.py     - Network profiles, explicit caps, miner list and blocklist
+    ├── amounts.py    - Exact 18-decimal FLOP amounts (floats refused)
+    ├── ledger.py     - Append-only spend ledger (SQLite triggers)
+    ├── policy.py     - FlopPolicy: the only path to signing or spending; kill switch
+    ├── client.py     - Chain reads via flop-sdk / substrate-interface, runtime check
+    ├── wallet.py     - Spend keystore (key design A)
+    ├── faucet.py     - Faucet draws with genesis checks
+    ├── inference.py  - direct (CLI) and gateway routes, plan/execute
+    ├── tasks.py      - Useful-work tasks and the secret guard
+    ├── recovery.py   - Permissionless channel recovery (expire_force_open, timeout, finalize)
+    ├── touchstone.py - Encrypted, buffered reporting to Touchstone
+    ├── secretfiles.py- Owner-only files or systemd credentials
+    └── cli.py        - `flopstar flop ...`
 ```
 
-Other directories: `deploy/` (systemd units and timers), `docs/` (`HANDOFF.md` for current state
-and next steps, `TREE.md` for the key tree design) and `vendor/close-call/` (the challenge package).
+Other directories: `deploy/` (systemd units and timers, `flop.example.toml`), `docs/`
+(`HANDOFF.md` for current state and next steps, `TREE.md` for the key tree design, `FLOP.md` for
+the FLOP agent) and `vendor/close-call/` (the challenge package).
 
 ### Key Design Decisions
 
@@ -154,6 +234,8 @@ and next steps, `TREE.md` for the key tree design) and `vendor/close-call/` (the
 7. **Flat main key**: The Flopstar key holds the identity and owns the room but never trades;
    trading is done by a 64-key tree (`docs/TREE.md`), whose keys sign only through `TreeSigner`
 8. **Dry run by default**: Signing commands only post with `--post`; the trader only with `--live`
+9. **Separate keys by role on FLOP**: the owner key stays off FLOP; a capped spend account pays,
+   and only `FlopPolicy` signs (see [FLOP Agent](#flop-agent))
 
 ## Vendored Code
 
@@ -181,6 +263,11 @@ uv run pytest tests/test_fold_conformance.py -v
 
 The conformance test verifies the vendored fold produces expected output on `sample-season.jsonl`.
 
+The suite has 198 tests. The FLOP tests use throwaway keys, mocked transports and a fake CLI runner.
+None touches the owner key, the tree seed or a live network. The `flop session run` fixtures in
+`tests/fixtures/flop/` are **synthetic** (shaped from the CLI's source) until real devnet output can
+be captured.
+
 ## Development
 
 ### Git Workflow
@@ -205,6 +292,10 @@ Flopstar runs on a dedicated droplet under systemd, as a non-root `flopstar` use
 passphrase and the tree seed exist there only as systemd encrypted credentials. The full runbook,
 the unit list and how to deploy a change are in [docs/HANDOFF.md](docs/HANDOFF.md) (§3 and §7).
 
+The FLOP agent's units are in `deploy/`: `flopstar-flop-run.*` (task runner, three times a day),
+`flopstar-flop-recovery.*` (hourly) and `flopstar-flop-faucet.service` (one draw). They are
+examples, not installed by default; their state on the droplet is in HANDOFF §10.
+
 Never transport the key or the seed through git, Slack, email, or logs.
 
 ## License
@@ -212,6 +303,9 @@ Never transport the key or the seed through git, Slack, email, or logs.
 See LICENSE and NOTICE files. The vendored challenge code retains its original license.
 
 ## Contest Information
+
+**Concluded.** Trading locked at sweep 2556 on 4 Oct 2026; final price *S* = 234.69. Flopstar's
+best keys scored +312.25 and didn't place.
 
 - **Contest ID**: `close-1`
 - **Opening**: September 25, 2026, 12:00 UTC
@@ -240,3 +334,5 @@ Contribution to the FLOP network community.
 - [Challenge Repository](https://github.com/flop-labs/technocore-close-call-challenge)
 - [Technocore.chat](https://technocore.chat)
 - [Contest Rules](vendor/close-call/close-call-game.md)
+- [FLOP docs](https://docs.flop.network) and [SDK references](https://docs.flop.network/docs/sdk-references)
+- [flop-sdk on PyPI](https://pypi.org/project/flop-sdk/) (pinned `==0.2.0`)
