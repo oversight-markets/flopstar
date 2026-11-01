@@ -1,9 +1,10 @@
-# Flopstar Handoff: close-1 concluded, services wound down
+# Flopstar Handoff: close-1 concluded; FLOP agent built and parked for testnet
 
 **Project**: Flopstar, an agent for FLOP Labs' Close Call contest (`close-1`) on technocore.chat
 **Repository**: https://github.com/oversight-markets/flopstar
 **Written**: 25 September 2026, 15:40 UTC; **updated 25 September 2026, 23:05 UTC** after the move; **28 September 2026, 19:50 UTC** after
-the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down
+the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down;
+**1 November 2026, 18:10 UTC** for the FLOP agent (§10)
 **Host**: droplet `flopstar` (68.183.21.81), running only Flopstar
 **Previous host**: `hoodwatch` (167.99.238.68): decommissioned for Flopstar on 25 Sep; its repo
 clone was deleted and its copies of the key and seed shredded (owner-confirmed)
@@ -14,6 +15,11 @@ naming the 64 tree keys is posted ([STATEMENT.md](STATEMENT.md)), and every serv
 stopped and disabled. The keys, credentials and data are all still on the droplet; what to do with
 them is the owner's call (§8). §3 stays as the runbook for rebuilding the droplet. Section 2 is
 the only place where a mistake can't be undone.
+
+**Since 1 Nov 2026 the droplet also hosts the FLOP agent** (`src/flopstar/flop/`): Flopstar buying
+inference on the FLOP Network, with every purchase recorded and reported to Touchstone. It is built,
+deployed and holds a spend account, but it is **parked until FLOP's testnet** (target 3 Nov 2026) and
+spends nothing. State and next steps: **§10**. Design and sources: [FLOP.md](FLOP.md).
 
 ---
 
@@ -49,6 +55,8 @@ the only place where a mistake can't be undone.
 | Key passphrase | The owner's head / password manager; on the droplet only as `/etc/flopstar/creds/flopstar-passphrase.cred` | – | Never typed into chat, a repo, `data/` or a log. |
 | `close1-master.seed` (32 bytes, hex) | Droplet, only as `/etc/flopstar/creds/close1-master-seed.cred`; the owner's offline backup. The hoodwatch copy is shredded. | 2 | The offline backup is now the only way to rebuild the droplet's seed. Recreates all 64 tree keys. Losing it loses the tree; leaking it leaks all 64 keys. |
 | `evidence/` (pre-contest proof for the sonnet contest) | The owner's Mac only | 1 | Not needed on the droplet. Keep it backed up. |
+| FLOP spend key (sr25519, encrypted Polkadot JSON keystore) | Droplet `/var/lib/flopstar/flop/spend.json` (0600 flopstar). Address `5C9zWSykX2EHGF6pbRkPGTHrjYcnj2WjQRnm2xbPfye4uUFb`. | 1 | Generated on the droplet 1 Nov (§10). **No backup.** It holds only devnet FLOP (none yet), so losing it costs nothing today; back up keystore + passphrase before it holds testnet funds. |
+| FLOP spend keystore passphrase | Droplet only, as `/etc/flopstar/creds/flop-spend-passphrase.cred` (32 random bytes, generated straight into `systemd-creds`; nobody has seen it) | 1 | Decryptable only on this droplet (host key). Losing the droplet loses the spend account. |
 
 **Rules**
 - **Transfers:** move secrets only over SSH. Never via git, chat, email or logs.
@@ -336,8 +344,10 @@ src/flopstar/
 ├── treecli.py     tree: init | dids | dryrun
 ├── treesigner.py  tree-key signing, policy-checked and logged
 ├── hyperliquid.py latest xyz:NVDA trade, for pricing
-└── trader.py      the tree trader: shadow fold, reconciliation, posting, kill switch
-deploy/            systemd units, timers, same-host MIGRATION.md
+├── trader.py      the tree trader: shadow fold, reconciliation, posting, kill switch
+└── flop/          the FLOP agent (§10, FLOP.md): config, amounts, ledger, policy, client,
+                   wallet, faucet, inference, tasks, recovery, touchstone, secretfiles, cli
+deploy/            systemd units, timers, same-host MIGRATION.md, flop.example.toml
 docs/TREE.md       key tree design, dry-run results and how the trader runs it
 vendor/close-call/ challenge package at 66c1da3. Never edit it.
 ```
@@ -381,7 +391,7 @@ systemctl restart flopstar-trader flopstar-trader-paper    # state is saved; the
 Environment variables: `FLOPSTAR_KEY_PATH`, `FLOPSTAR_PASSPHRASE_FILE`, `FLOPSTAR_DATA_DIR`,
 `FLOPSTAR_TREE_SEED_PATH`.
 
-Checks: `uv run pytest -q` (29 tests), `uv run ruff check`, and `python3 vendor/close-call/scripts/verify.py`.
+Checks: `uv run pytest -q` (198 tests), `uv run ruff check`, and `python3 vendor/close-call/scripts/verify.py`.
 
 ---
 
@@ -403,7 +413,10 @@ The rest is optional, and the owner decides:
      retired.
 2. **Data.** Archive `/var/lib/flopstar/data` (about 30 MB) off the droplet before retiring it.
    The registration and statement evidence can't be rebuilt once the rooms expire.
-3. **The droplet itself.** With nothing running it can be powered off or destroyed after 1–2.
+3. **The droplet itself.** ~~Can be powered off or destroyed after 1–2.~~ **No longer**: since
+   1 Nov it hosts the FLOP agent and its spend key (§10), whose passphrase credential can only be
+   decrypted on this droplet. Destroying it loses the spend account. The close-1 secrets in item 1
+   can still be cleaned up independently.
 4. **Official results.** `d-close1-results` (reserved in `contest.json`) should hold the final
    standings. Read it once if a confirmed final score is wanted; our own +312.25 comes from the
    shadow fold at *S*.
@@ -468,3 +481,73 @@ SELECT json_extract(json_extract(raw_json, '$.text'), '$.t') AS t, COUNT(*) FROM
 - [x] `core.hooksPath` set in `/opt/flopstar`
 - [x] hoodwatch copies shredded after verification; only one monitor and one signer running
 - [x] `git log --all -- '*.pem' '*.seed'` is empty
+- [ ] **Changed 1 Nov (§10):** Docker is installed and `flopstar` is in the `docker` group, which
+  is root-equivalent on this host. Nothing running as `flopstar` may take commands from model
+  output or remote input. No container publishes ports (the CLI uses `--network host` with no
+  `-p`), so Docker's iptables rules don't open anything past `ufw`. Undo: `gpasswd -d flopstar docker`.
+
+---
+
+## 10. FLOP agent: built, parked for testnet (1 Nov 2026, 18:10 UTC)
+
+Flopstar's second job: buy useful inference on the FLOP Network, keep a verifiable record of every
+purchase, and report it to Touchstone. The full design, sources, open questions (S1–S12) and the
+go-live sequence are in [FLOP.md](FLOP.md); this section is the operational state.
+
+**Decision (owner, 1 Nov):** don't ask FLOP about the open questions; testnet (target Tue 3 Nov,
+not yet live, hostnames don't resolve) should answer them. Until then the agent spends nothing.
+
+| Item | State |
+|---|---|
+| Code | Phases 0–7 complete in `src/flopstar/flop/`, pushed to `main` and deployed to `/opt/flopstar` (venv synced; `flop-sdk==0.2.0`). |
+| Key design | **A**: the owner key (`flopstar.pem`) does nothing on FLOP. A separate sr25519 **spend account** pays escrow; its balance plus FlopPolicy's caps bound spending. Only `flop/policy.py` signs or launches the signing CLI. |
+| Network | **devnet** (earns nothing). `/etc/flopstar/flop.toml` (0640 root:flopstar) is the example config: genesis pinned `0x99c1…d631`, caps 0.01 FLOP/request, 0.5/day, 6 requests/h, 1 faucet draw/day, model `qwen/qwen2.5-0.5b-instruct`, **no miners listed**, empty blocklist. |
+| Spend account | `5C9zWSykX2EHGF6pbRkPGTHrjYcnj2WjQRnm2xbPfye4uUFb`, **0 FLOP**. Keystore and passphrase credential in §2. Verified: decrypts via the credential as `flopstar`. |
+| Faucet | First draw (2026-11-01 18:03 UTC) refused: 429 "IP daily grant budget reached", although this IP had never drawn. Recorded as failed draw #1; kill switch not tripped. |
+| Timers | **One-off** `flopstar-flop-faucet-retry.timer` (enabled, `Persistent=true`) fires `flopstar-flop-faucet.service` once at **2026-11-02 18:10 UTC**. The timer file exists only in `/etc/systemd/system`; **remove it after it fires** (below). The task runner and recovery units (`deploy/flopstar-flop-run.*`, `flopstar-flop-recovery.*`) are **not installed**. |
+| Kill switch | `/var/lib/flopstar/data/KILL-flop`: absent (clear). |
+| Ledger | `flop_spend`, `flop_spend_events`, `flop_faucet_draws` in `/var/lib/flopstar/data/flopstar.db` (append-only via triggers). One row: the failed faucet draw. Signatures/authorisations log: `data/flop-signatures.log`. |
+| Touchstone | Not configured (no `TOUCHSTONE_*` settings or credentials). Reports would be skipped; nothing is buffered. Wire schema `flopstar.touchstone.v0` is provisional (FLOP.md T1–T4). |
+| CLI runtime | Docker 29.1.3 (Ubuntu `docker.io`, updated by `unattended-upgrades`); pinned image `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd` pulled and verified (`--version` → `0.1.220`; `session run` accepts every flag we pass). Every CLI container runs with `--memory 640m --memory-swap 1g --pids-limit 256`. |
+| Host changes | Docker installed; `flopstar` in the `docker` group (§9); 2 GiB `/swapfile` (in `/etc/fstab`); kernel now `6.8.0-147-generic`. |
+
+**Incident, 1 Nov 17:55 UTC.** The droplet (961 MiB RAM, no swap then) hard-reset while an uncapped
+CLI container ran `--version` during the Docker check; it rebooted on its own at 17:56. No service
+was running, so nothing was interrupted. Fixed with the swap file and the container caps above. Any
+`docker run` here gets those caps and a `timeout`; if the CLI needs more, resize the droplet.
+
+**What blocks real spending** (each needs FLOP's testnet to land or an owner decision):
+- **Miner endpoints (S3):** `session run` needs a reachable miner session endpoint and none are
+  published, so `[<net>.miners]` is empty.
+- **Gateway key (S4):** the gateway needs a funded API key; the only published enrolment creates an
+  unencrypted wallet.
+- **Testnet details (S2/S5):** genesis hash, HTTPS RPC URL and the supported CLI build.
+- **DID-signed flow (S1):** if testnet credits only requests signed with the TechnoCore DID, design A
+  has to be revisited (FLOP.md §7).
+
+**Next steps when testnet is live:** follow the go-live sequence at the end of FLOP.md §12, dry run
+first at every step and each `--post` only with the owner's go-ahead: pin the testnet genesis,
+`rpc_http_url`, miners and models in `/etc/flopstar/flop.toml`, then `status`, `faucet`, one `ask`,
+`recovery`, Touchstone `check`/`register`, then decide on installing the task-runner and recovery
+timers. Back up the spend keystore and passphrase before it holds testnet funds.
+
+**Commands** (read-only unless noted; run as `flopstar` with the production environment):
+```bash
+FLOP="runuser -u flopstar -- env HOME=/var/lib/flopstar FLOPSTAR_DATA_DIR=/var/lib/flopstar/data \
+  FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json \
+  /opt/flopstar/.venv/bin/flopstar flop"
+$FLOP status                      # chain identity, health, spend balance, budget, kill switch
+$FLOP config                      # resolved profile, caps, paths
+$FLOP faucet                      # dry run; --post draws (needs the owner's go-ahead)
+$FLOP recovery                    # channels holding escrow (none yet)
+journalctl -u flopstar-flop-faucet.service          # after tomorrow's retry
+cat /var/lib/flopstar/data/KILL-flop                 # exists only if tripped; holds the reasons
+# after the retry has fired:
+systemctl disable --now flopstar-flop-faucet-retry.timer && \
+  rm /etc/systemd/system/flopstar-flop-faucet-retry.timer && systemctl daemon-reload
+```
+Commands that need the spend passphrase (`wallet`/`ask`/`run`/`recovery --post`) run as a unit or
+`systemd-run` with `LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred`
+and `FLOPSTAR_FLOP_PASSPHRASE_FILE=${CREDENTIALS_DIRECTORY}/flop-spend-passphrase` (see
+`deploy/flopstar-flop-run.service`).
+
