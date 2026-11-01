@@ -1,0 +1,27 @@
+# One faucet draw into the FLOP spend account (`flop faucet --post`). Needs no credential: the faucet
+# is keyed by the spend account's public address. FlopPolicy enforces max_faucet_draws_per_day and
+# the genesis checks; a refusal (e.g. 429) is recorded as a failed draw. Started by hand or by a
+# one-off timer; not enabled on its own.
+[Unit]
+Description=Flopstar FLOP faucet draw
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=flopstar
+Group=flopstar
+WorkingDirectory=/opt/flopstar
+Environment=HOME=/var/lib/flopstar
+Environment=FLOPSTAR_DATA_DIR=/var/lib/flopstar/data
+Environment=FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
+Environment=FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json
+ExecStart=/opt/flopstar/.venv/bin/flopstar flop faucet --post
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flopstar/data
+ReadOnlyPaths=/var/lib/flopstar/flop
+InaccessiblePaths=/etc/flopstar/keys /etc/flopstar/creds
