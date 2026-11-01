@@ -29,3 +29,9 @@ max_requests_per_hour = 6
 max_faucet_draws_per_day = 1   # lower this to FLOP's per-identity limit once published (S7)
 allowed_models = []            # fill from the testnet gateway/registry once live
 same_control_miners = []
+
+# Miners for direct sessions: SS58 = public HTTPS session endpoint. FLOP publishes no endpoint
+# discovery yet (docs/FLOP.md S3); list only miners whose operators gave you an endpoint, and never
+# one Oversight controls (add those to same_control_miners, which always wins).
+# [devnet.miners]
+# "5ED68Tgj9G6xtPnWKxzBkr7cij6nPR3kVXUYQ2RT27igsrH2" = "https://miner.example/session"

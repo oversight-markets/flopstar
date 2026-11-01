@@ -2,6 +2,9 @@
 FLOP network profiles, spend caps, blocklist and paths. Read-only: nothing here signs or calls out.
 
 Network: FLOPSTAR_FLOP_NETWORK (devnet | testnet), else `network` in the config file, else devnet.
+Other env: FLOPSTAR_FLOP_KEYSTORE (spend keystore), FLOPSTAR_FLOP_PASSPHRASE_FILE (its passphrase,
+else prompt), FLOPSTAR_FLOP_GATEWAY_KEY_FILE (gateway API key, 0600), FLOPSTAR_FLOP_CLI (how to run
+the pinned CLI: "docker", "npx", or a path to a `flop` executable; default: docker if present).
 Config file: FLOPSTAR_FLOP_CONFIG, default ~/.config/flopstar/flop.toml (example:
 deploy/flop.example.toml). Every cap must be set explicitly per network; amounts are decimal
 strings, never TOML floats. Sources for the built-in profiles are in docs/FLOP.md §3.1 and §4.
@@ -10,7 +13,7 @@ strings, never TOML floats. Sources for the built-in profiles are in docs/FLOP.m
 import os
 import re
 import tomllib
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -122,6 +125,15 @@ class FlopConfig:
     config_path: Path
     keystore_path: Path
     data_dir: Path
+    miners: dict[str, str] = field(default_factory=dict)
+    passphrase_file: Path | None = None
+    gateway_key_file: Path | None = None
+    cli_runner: str | None = None
+
+    def subdir(self, name: str) -> Path:
+        path = self.data_dir / name
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
     @property
     def kill_path(self) -> Path:
@@ -166,10 +178,10 @@ def ss58_pubkey(address: str) -> str:
 
 
 def _profile(name: str, overrides: dict) -> NetworkProfile:
-    unknown = set(overrides) - _PROFILE_KEYS - {"caps"}
+    unknown = set(overrides) - _PROFILE_KEYS - {"caps", "miners"}
     if unknown:
         raise ConfigError(f"[{name}] has unknown keys: {sorted(unknown)}")
-    values = {k: v for k, v in overrides.items() if k != "caps"}
+    values = {k: v for k, v in overrides.items() if k not in ("caps", "miners")}
     for key, value in values.items():
         if not isinstance(value, str):
             raise ConfigError(f"[{name}].{key} must be a string")
@@ -233,6 +245,24 @@ def _caps(name: str, table: dict | None) -> Caps:
     )
 
 
+def _miners(name: str, table) -> dict[str, str]:
+    """
+    [<net>.miners]: SS58 -> session endpoint. SPEC(S3): FLOP publishes no endpoint discovery, so
+    the operator lists miners whose public HTTPS session endpoint they know.
+    """
+    if table is None:
+        return {}
+    if not isinstance(table, dict):
+        raise ConfigError(f"[{name}.miners] must be a table of SS58 = \"https://...\"")
+    out = {}
+    for ss58, url in table.items():
+        ss58_pubkey(ss58)
+        if not isinstance(url, str) or urlparse(url).scheme != "https" or not urlparse(url).hostname:
+            raise ConfigError(f"[{name}.miners] {ss58}: endpoint must be an https:// URL")
+        out[ss58] = url.rstrip("/")
+    return out
+
+
 def get_config_path(env=None) -> Path:
     env = os.environ if env is None else env
     return Path(env.get("FLOPSTAR_FLOP_CONFIG", DEFAULT_CONFIG_PATH)).expanduser()
@@ -267,4 +297,12 @@ def load_config(path: Path | None = None, network: str | None = None, env=None) 
         config_path=path,
         keystore_path=Path(env.get("FLOPSTAR_FLOP_KEYSTORE", DEFAULT_KEYSTORE_PATH)).expanduser(),
         data_dir=base_config.get_data_dir(),
+        miners=_miners(name, table.get("miners")),
+        passphrase_file=_path(env.get("FLOPSTAR_FLOP_PASSPHRASE_FILE")),
+        gateway_key_file=_path(env.get("FLOPSTAR_FLOP_GATEWAY_KEY_FILE")),
+        cli_runner=env.get("FLOPSTAR_FLOP_CLI") or None,
     )
+
+
+def _path(value: str | None) -> Path | None:
+    return Path(value).expanduser() if value else None

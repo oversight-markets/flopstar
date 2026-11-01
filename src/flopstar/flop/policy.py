@@ -15,6 +15,7 @@ never trip the switch. `authorize_*` methods are the real gate and do trip it.
 """
 
 import json
+import subprocess
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -25,6 +26,10 @@ from ..signer import PolicyViolation
 from .amounts import format_flop
 from .config import FlopConfig
 from .ledger import DAY, HOUR, ROUTES, Ledger
+
+
+class CliTimeout(Exception):
+    """The signing CLI ran past its timeout and was killed; escrow may be locked."""
 
 
 class KillSwitchTripped(PolicyViolation):
@@ -68,6 +73,15 @@ class Budget:
             "faucet_draws_today": self.faucet_draws_today,
             "faucet_draws_left_today": self.faucet_draws_left_today,
         }
+
+
+def redact_argv(argv: list[str]) -> list[str]:
+    """argv for logs: the prompt (data we may not want in a long-lived log) becomes its length."""
+    out, hide = [], False
+    for a in argv:
+        out.append(f"<{len(a)} chars>" if hide else a)
+        hide = a == "--prompt"
+    return out
 
 
 class FlopPolicy:
@@ -259,11 +273,32 @@ class FlopPolicy:
                 raise RuntimeError(f"{pallet}.{call} failed on chain: {receipt.error_message}")
             return tx_hash
 
-    def log_cli_signature(self, kind: ActionKind, argv: list[str], signer: str,
-                          result: dict) -> None:
-        """Record a signature made by the pinned CLI subprocess on our behalf (route=direct)."""
-        self._log({"kind": "cli", "action": kind, "argv": argv, "signer": signer,
-                   "result": result})
+    def run_signing_cli(self, kind: ActionKind, argv: list[str], env: dict[str, str], *,
+                        signer: str, spend_id: int, timeout: float,
+                        runner: Callable | None = None) -> subprocess.CompletedProcess:
+        """
+        Launch the pinned `flop` CLI, which signs with the spend keystore (route=direct). This is the
+        only place the package starts it. The spend must already be authorized; secrets travel only
+        in `env` (never argv), and the logged argv has the prompt redacted.
+        """
+        if kind is not ActionKind.INFERENCE:
+            raise PolicyViolation(f"{kind} may not run the signing CLI")
+        self.ensure_alive()
+        row = self.ledger.get(spend_id)
+        if row["status"] != "sent":
+            raise PolicyViolation(f"spend {spend_id} is {row['status']}, not sent")
+        if any("PASSWORD" in a.upper() and "=" in a for a in argv):
+            raise PolicyViolation("refusing a secret on the command line")
+        self._log({"kind": "cli", "action": kind, "spend_id": spend_id, "signer": signer,
+                   "argv": redact_argv(argv)})
+        try:
+            return (runner or subprocess.run)(argv, env=env, capture_output=True, text=True,
+                                              timeout=timeout, check=False)
+        except subprocess.TimeoutExpired as e:
+            raise CliTimeout(f"signing CLI exceeded {timeout}s") from e
+
+    def log_cli_result(self, spend_id: int, result: dict) -> None:
+        self._log({"kind": "cli-result", "spend_id": spend_id, "result": result})
 
     # ---- internals ----------------------------------------------------------------------------
 

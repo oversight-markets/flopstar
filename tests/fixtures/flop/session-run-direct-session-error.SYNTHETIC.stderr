@@ -1,0 +1,8 @@
+Faucet request attempt 1 failed: fetch failed. Retrying...
+{
+  "ok": false,
+  "code": "FLOP_ERROR",
+  "message": "miner acknowledgement timed out (channel 0xf45ef2bb28803a41ec18a93782a34daabafffab9f2a8bc6cfbe8129dda5b6afc)",
+  "retryable": false,
+  "next": "check miner endpoint, registry identity, signer balance and channel state"
+}

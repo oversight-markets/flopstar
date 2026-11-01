@@ -1,0 +1,7 @@
+{
+  "ok": false,
+  "code": "FLOP_ERROR",
+  "message": "direct session failed; on-chain recovery failed (channel 0xe57f96718c9f2c06f8bf631387033abbbf201b82eb2e611d7162a02125107453)",
+  "retryable": false,
+  "next": "check miner endpoint, registry identity, signer balance and channel state"
+}

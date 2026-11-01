@@ -238,6 +238,22 @@ class Ledger:
         )
         return [dict(r) for r in rows]
 
+    def last_used_miners(self, network: str) -> dict[str, str]:
+        """miner -> timestamp of our latest request to it."""
+        rows = self.conn.execute(
+            "SELECT miner, MAX(ts) AS ts FROM flop_spend WHERE network = ? AND miner IS NOT NULL"
+            " GROUP BY miner", (network,))
+        return {r["miner"]: r["ts"] for r in rows}
+
+    def unchanneled_failures(self, network: str, since: datetime) -> list[dict]:
+        """Direct requests that were sent but never learned their channel (e.g. a CLI timeout)."""
+        rows = self.conn.execute(
+            "SELECT * FROM flop_spend WHERE network = ? AND route = 'direct' AND ts >= ?"
+            " AND channel_id IS NULL AND status IN ('sent', 'failed')"
+            " AND EXISTS (SELECT 1 FROM flop_spend_events e WHERE e.spend_id = flop_spend.id"
+            " AND e.status = 'sent') ORDER BY id", (network, _iso(since)))
+        return [dict(r) for r in rows]
+
     # ---- caps ---------------------------------------------------------------------------------
 
     def spent_since(self, network: str, since: datetime) -> int:

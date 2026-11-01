@@ -1,0 +1,10 @@
+{
+  "reply": "OK. The referee posted 288 sweeps; no voids.",
+  "miner": "5ED68Tgj9G6xtPnWKxzBkr7cij6nPR3kVXUYQ2RT27igsrH2",
+  "channel": "0x1beccc73e7032a5346e12451b78b8217257d6c331970c72536e85b62072c954d",
+  "settle_tx": "0x5b2f7c4e0a1d3e9f8c6b5a4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b",
+  "cooperative": true,
+  "verified_turns": 1,
+  "finish_reason": "stop",
+  "completion_tokens": "14"
+}
