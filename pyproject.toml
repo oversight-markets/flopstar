@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "base58>=2.1.1",
     "cryptography>=42.0.0",
+    "flop-sdk==0.2.0",
     "httpx>=0.27.0",
 ]
 

@@ -39,6 +39,7 @@ CLI (`src/flopstar/cli.py`, entry point `flopstar`):
 | `uv run flopstar trader status --live` | no; reads the live state |
 | `uv run flopstar trader run --live` | yes: posts the tree's trades (tree seed) |
 | `uv run flopstar trader register [--post]` | only with `--post` (tree seed) |
+| `uv run flopstar flop config [--json]` | no; FLOP network profile, caps, paths |
 
 Every signing command is a dry run unless `--post` (or, for the trader, `--live`) is given.
 **Never run a `--post` or `--live` command, `room claim`, or `tree init` without explicit
@@ -94,6 +95,12 @@ Env vars: `FLOPSTAR_KEY_PATH` (default `~/.config/flopstar/flopstar.pem`),
   `git -c safe.directory=/opt/flopstar -C /opt/flopstar pull --ff-only /root/var/www/flopstar main`
   then `chown -R flopstar:flopstar /opt/flopstar` and a service restart (HANDOFF §7). Runtime data
   is `/var/lib/flopstar/data`, not `./data`.
+
+- **FLOP agent** (`src/flopstar/flop/`, design and sources in `docs/FLOP.md`): buys inference on
+  the FLOP Network, separate from the contest modules. Config is `FLOPSTAR_FLOP_CONFIG` (TOML,
+  example `deploy/flop.example.toml`) + `FLOPSTAR_FLOP_NETWORK`; every cap is explicit and amounts
+  are int base units / decimal strings (`flop/amounts.py`), never floats. Never pass a secret to
+  `flop_sdk.SubstrateOptions.seed` (it derives from the public dev phrase; FLOP.md §2.3).
 
 ## Secrets
 

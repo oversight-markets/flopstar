@@ -1,0 +1,31 @@
+# Flopstar FLOP config. Copy to ~/.config/flopstar/flop.toml (or set FLOPSTAR_FLOP_CONFIG).
+# Every cap is required. Amounts are decimal FLOP strings ("0.01"), never TOML floats.
+# FLOPSTAR_FLOP_NETWORK overrides `network`. Devnet earns nothing.
+
+network = "devnet"
+
+[devnet]
+# Endpoints, genesis and CLI pin default to the built-in profile (src/flopstar/flop/config.py);
+# override any of: rpc_url, rpc_http_url, faucet_url, gateway_url, indexer_url, mcp_url,
+# genesis_hash, cli_npm_version, cli_image.
+
+[devnet.caps]
+max_flop_per_request = "0.01"
+max_flop_per_day = "0.5"
+max_requests_per_hour = 6
+max_faucet_draws_per_day = 1
+allowed_models = ["qwen/qwen2.5-0.5b-instruct"]
+same_control_miners = []   # SS58 addresses of miners Oversight controls; never buy from them
+
+[testnet]
+# Testnet refuses to run until its genesis is pinned (FLOP: "pin-before-live", docs/FLOP.md S2).
+# genesis_hash = "0x..."
+# rpc_http_url = "https://..."
+
+[testnet.caps]
+max_flop_per_request = "0.01"
+max_flop_per_day = "0.5"
+max_requests_per_hour = 6
+max_faucet_draws_per_day = 1   # lower this to FLOP's per-identity limit once published (S7)
+allowed_models = []            # fill from the testnet gateway/registry once live
+same_control_miners = []

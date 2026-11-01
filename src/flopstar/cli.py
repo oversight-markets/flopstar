@@ -15,6 +15,7 @@ def main():
         print("  tree       Key tree: init|dids|dryrun [paths] (never signs or posts)")
         print("  trader     Tree trader: run|status [--live] (paper unless --live); register [--post]")
         print("  verify-key Check the owner key decrypts and matches flopstar.did")
+        print("  flop       FLOP agent: config (see `flopstar flop`)")
         sys.exit(1)
 
     command = sys.argv[1]
@@ -34,6 +35,9 @@ def main():
     elif command == "trader":
         from .trader import run_trader
         asyncio.run(run_trader(sys.argv[2:]))
+    elif command == "flop":
+        from .flop.cli import run_flop
+        run_flop(sys.argv[2:])
     elif command == "verify-key":
         from .signer import did_from_private_key, expected_did, load_private_key
         did = did_from_private_key(load_private_key())
