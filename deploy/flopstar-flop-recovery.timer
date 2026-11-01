@@ -1,0 +1,11 @@
+# Hourly: the ack window is 600 blocks and direct-session SLAs are ~20 min on devnet.
+[Unit]
+Description=Flopstar FLOP channel recovery, hourly
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+Unit=flopstar-flop-recovery.service
+
+[Install]
+WantedBy=timers.target

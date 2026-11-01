@@ -1,0 +1,12 @@
+# Three task runs a day; each spends only when a task has real input (FLOP.md §12).
+[Unit]
+Description=Flopstar FLOP task runner, three times a day
+
+[Timer]
+OnCalendar=*-*-* 03,11,19:17:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+Unit=flopstar-flop-run.service
+
+[Install]
+WantedBy=timers.target

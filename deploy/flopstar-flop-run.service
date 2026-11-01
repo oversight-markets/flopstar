@@ -1,0 +1,39 @@
+# FLOP useful-work tasks (contest-digest, ops-review, research-notes), --post: buys inference
+# within the caps in /etc/flopstar/flop.toml. Key design A: gets only the spend-keystore passphrase,
+# never the owner key (InaccessiblePaths) or the tree seed. Stops on data/KILL-flop.
+# Example unit: not installed or enabled by default (docs/FLOP.md §12).
+[Unit]
+Description=Flopstar FLOP task runner (buys inference)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=flopstar
+Group=flopstar
+WorkingDirectory=/opt/flopstar
+Environment=HOME=/var/lib/flopstar
+Environment=FLOPSTAR_DATA_DIR=/var/lib/flopstar/data
+Environment=FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
+Environment=FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json
+Environment=FLOPSTAR_FLOP_PASSPHRASE_FILE=%d/flop-spend-passphrase
+LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred
+# Touchstone (optional; reports buffer to data/touchstone-buffer.jsonl until configured):
+# Environment=TOUCHSTONE_API_URL=http://touchstone.<tailnet>.ts.net:8080
+# Environment=TOUCHSTONE_API_TOKEN_FILE=%d/touchstone-token
+# Environment=TOUCHSTONE_STREAK_KEY_FILE=%d/touchstone-streak-key
+# LoadCredentialEncrypted=touchstone-token:/etc/flopstar/creds/touchstone-token.cred
+# LoadCredentialEncrypted=touchstone-streak-key:/etc/flopstar/creds/touchstone-streak-key.cred
+# The pinned CLI runs from the image digest in flop.toml. Membership of the docker group is
+# root-equivalent; see docs/FLOP.md §11 before granting it.
+Environment=FLOPSTAR_FLOP_CLI=docker
+SupplementaryGroups=docker
+ExecStart=/opt/flopstar/.venv/bin/flopstar flop run --post
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flopstar/data
+ReadOnlyPaths=/var/lib/flopstar/flop
+InaccessiblePaths=/etc/flopstar/keys

@@ -42,10 +42,12 @@ CLI (`src/flopstar/cli.py`, entry point `flopstar`):
 | `uv run flopstar flop config [--json]` | no; FLOP network profile, caps, paths |
 | `uv run flopstar flop touchstone status\|check` | no (`check` GETs Touchstone's /openapi.json) |
 | `uv run flopstar flop touchstone register\|replay [--post]` | sends to Touchstone only with `--post` |
+| `uv run flopstar flop status` / `wallet address` | no; read-only (status reads the chain) |
+| `uv run flopstar flop wallet setup\|fund` / `faucet` / `ask` / `run` / `recovery` | only with `--post` (spend key) |
 
 Every signing command is a dry run unless `--post` (or, for the trader, `--live`) is given.
-**Never run a `--post` or `--live` command, `room claim`, or `tree init` without explicit
-instruction from the user** — they publish signed messages to a live contest, and a room claim /
+**Never run a `--post` or `--live` command (including any `flop` one), `room claim`, or `tree init`
+without explicit instruction from the user** — they publish signed messages to a live contest, and a room claim /
 the master seed can't be redone (`tree init` refuses if a seed exists; it must never be
 re-created). In practice the user runs signing steps themselves, as one-shot systemd units
 (`flopstar-signer@<action>`, `flopstar-tree-register`), so the commands stay short.

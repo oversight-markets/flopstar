@@ -1,0 +1,28 @@
+# Recover escrow from our own compute channels: expire_force_open / timeout / finalize, which are
+# permissionless and only return our escrow. Submitted through FlopPolicy with the spend key.
+# Example unit: not installed or enabled by default.
+[Unit]
+Description=Flopstar FLOP channel recovery
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=flopstar
+Group=flopstar
+WorkingDirectory=/opt/flopstar
+Environment=HOME=/var/lib/flopstar
+Environment=FLOPSTAR_DATA_DIR=/var/lib/flopstar/data
+Environment=FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
+Environment=FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json
+Environment=FLOPSTAR_FLOP_PASSPHRASE_FILE=%d/flop-spend-passphrase
+LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred
+ExecStart=/opt/flopstar/.venv/bin/flopstar flop recovery --post
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flopstar/data
+ReadOnlyPaths=/var/lib/flopstar/flop
+InaccessiblePaths=/etc/flopstar/keys

@@ -6,8 +6,8 @@ read-only probes of devnet from the Flopstar droplet. Everything below is cited;
 confirmed by a source is listed as a `SPEC:` question in §9.
 
 > **Decision (2026-11-01): key design A (§7).** The owner key does nothing on FLOP until FLOP
-> publishes the DID-signed flow (S1); a separate capped spend account pays escrow. Phases 0–2 and 7
-> are built (§12); Phases 3–6 are next.
+> publishes the DID-signed flow (S1); a separate capped spend account pays escrow. Phases 0–7 are
+> built (§12); live spending waits on a CLI runtime here and FLOP's answers to S1, S3, S4.
 >
 > Original stop note: the published code does not
 > match the brief's key model: nothing links a `did:key` to a chain account, the faucet is not
@@ -287,9 +287,11 @@ Alternatives, if FLOP confirms the DID account is what must spend on testnet:
   a CLI flag (or SDK call) that exports the verified receipts/transcript for Touchstone?
 - **S7. Faucet limits.** The per-identity draw limit and claim period ("hourly or daily — not yet
   decided").
-- **S8. `ComputeChannel.Channels` storage layout** for recovery watching from Python (state names
-  `PendingAck`/`Open`/`Closed`, `ack_deadline`, `opened_at + max_duration`, challenge end), to be
-  decoded from metadata, not guessed.
+- **S8. Resolved 2026-11-01** from devnet metadata: `Channels: H256 -> Channel {agent, miner,
+  model_hash, measured_root, precision, enclave_key, agent_key, escrow: u128, sla {max_turns,
+  max_duration, reattest_every}, nonce, opened_at, last_attested_at, state, transcript_ref,
+  weights_pin, locked_compute_consumed}`; `ChannelState = Open | Settling {final_root, claimed_gn,
+  challenge_end} | Closed | PendingAck {ack_deadline}`; constant `AckWindow` = 600 blocks.
 - **S9. Does `FlopSessionKeys.execute_via_session` admit `ComputeChannel` calls** (`DENIED_PALLETS`
   is not visible in metadata)? Only matters for option B.
 - **S10. Devnet agent access.** The docs say both that agents can reach devnet and that devnet
@@ -326,6 +328,13 @@ ciphertext and hashes.
    never calls it and its units never set those variables.
 8. The gateway's 402 response names a payment `destination` of `5GrwvaEF…5N8F`. Flopstar never pays
    an address taken from a response.
+9. Running the pinned CLI needs either the `docker` group for the `flopstar` user (root-equivalent
+   on the host) or `npx`, which resolves the CLI's `^`-ranged dependencies at run time (not pinned
+   by FLOP's package). Prefer Docker, pinned by digest, on a host with nothing else valuable, or a
+   rootless Docker/Podman setup.
+10. `session run` puts the prompt on the command line (it has no stdin or file option). The task
+    runner refuses prompts that contain secrets, and our logs record only the prompt's length. But
+    other local users can read argv via `ps`, so the droplet should stay single-tenant.
 
 ## 12. Implementation status
 
@@ -334,7 +343,10 @@ ciphertext and hashes.
 | 1 | `flop/config.py`, `flop/amounts.py` | done: per-network profiles, explicit caps (decimal strings, floats refused), SS58 blocklist matched by public key, testnet refuses until its genesis is pinned |
 | 2 | `flop/ledger.py`, `flop/policy.py` | done (below) |
 | 7 | `flop/touchstone.py` | done (below); schema provisional until `touchstone check` passes against the real service |
-| 3–6 | wallet, faucet, inference, recovery, tasks | not started |
+| 3 | `flop/client.py`, `flop/wallet.py`, `flop/faucet.py` | done: `status` (live-tested on devnet), spend keystore, faucet draws |
+| 4 | `flop/inference.py` | done: direct (CLI) and gateway routes, native refused (S1); CLI parsing tested on **synthetic** fixtures only |
+| 5 | `flop/tasks.py`, `deploy/flopstar-flop-run.*` | done |
+| 6 | `flop/recovery.py`, `deploy/flopstar-flop-recovery.*` | done |
 
 **Ledger** (`data/flopstar.db`, tables `flop_spend`, `flop_spend_events`, `flop_faucet_draws`). SQLite
 triggers make it append-only. Core columns (`ts, network, route, model, max_flop, purpose,
@@ -385,4 +397,93 @@ Touchstone-side `SPEC:` items (to settle with whoever is updating Touchstone):
   DID-derived ed25519 account also be listed?
 - **T4.** Idempotency: we assume Touchstone dedupes on `client_digest` and returns 2xx for a
   duplicate (replays can resend after a crash between send and buffer rewrite).
+
+### Phases 3–6
+
+**Status and wallet.** `flopstar flop status` reports chain identity against the pin, the runtime
+spec, `FlopClient.health()`, our DID, the DID-derived identity account (unused under A), the spend
+account and its balance, caps, budget and the kill switch. `wallet setup --post` generates a fresh
+sr25519 key into an encrypted Polkadot JSON keystore (v3: scrypt + xsalsa20-poly1305, the format
+`flop --keystore` reads). The keystore is mode 0600 in a 0700 directory and never overwritten; the
+passphrase is ≥ 12 characters, from `FLOPSTAR_FLOP_PASSPHRASE_FILE` (0600) or a prompt. `wallet fund`
+checks the 3 × daily cap and then refuses: under design A the owner key funds nothing.
+
+**Faucet.** `faucet --post` requires the faucet's `/chain` genesis to equal both the pin and the RPC's
+genesis before drawing, then `POST /fund {address}` for the spend account. Response numbers parse as
+`Decimal`. 4xx/5xx/network failures are recorded as failed draws (they don't use the daily
+allowance and don't trip). A genesis mismatch or a malformed success trips the switch.
+
+**Inference.** One `plan()` (dry run: local state only) and one `execute()`; `ask` and the task runner
+both use them and refuse up front when `plan` reports problems, so routine budget exhaustion never
+trips the switch. Direct route:
+- The miner comes from `[<net>.miners]` (SS58 → HTTPS endpoint; S3), skipping the blocklist and
+  preferring the least recently used.
+- The CLI runs from the pinned image digest (`FLOPSTAR_FLOP_CLI=docker`) or `npx
+  @flop-labs/cli@<version>`, only via `FlopPolicy.run_signing_cli`, with a minimal environment
+  (`PATH`, `HOME`, `FLOP_KEY_PASSWORD`, `FLOP_INDEXER_URL`). The logged argv has the prompt replaced
+  by its length.
+- The ledger row moves to `sent` before the CLI starts. Output is parsed strictly and unknown fields
+  are refused. `sdk_verified` requires exit 0, `verified_turns ≥ 1` and the requested miner (by
+  public key).
+- A failure records the channel ID parsed from the error message. "on-chain recovery failed", an
+  unverified receipt, a miner mismatch or malformed output trips the switch.
+- `settled_flop` stays NULL (S6), so the cap keeps counting the full `max_flop`.
+
+Gateway route: bearer key from `FLOPSTAR_FLOP_GATEWAY_KEY_FILE` (0600), strict response check,
+always `unverified`. A 402 is a failure; we never pay an address taken from a response. Settled
+results go to Touchstone (if configured) with the exact request bytes and the CLI's stdout (direct)
+or HTTP body (gateway) as the response bytes.
+
+**Tasks** (`flop run`). Each task spends only when it has real input:
+- `contest-digest` needs referee messages stored in the last day.
+- `ops-review` needs a kill-switch trip, CLI error or failed request in the last day.
+- `research-notes` needs unanswered questions in `data/research-queue.txt` (at most 3 per run).
+
+Every prompt is refused if it contains a PEM private key, a Polkadot keystore, a valid BIP-39
+mnemonic, or the contents of any configured secret file. Untrusted input is fenced as data. Outputs
+go to `data/digests/`, `data/reports/` and `data/research/` under a "model output is untrusted"
+banner. The runner stops at the first refusal or failure.
+
+**Recovery** (`flop recovery`) reads our ledger channels at the finalized head:
+- `PendingAck` past `ack_deadline` → `expire_force_open`
+- `Open` past `opened_at + max_duration` → `timeout`
+- `Settling` past `challenge_end` → `finalize`
+
+If a run died before learning its channel, recovery scans `Channels` for ones paid by the spend
+account. It attaches an orphan to a ledger row only when exactly one of each exists. A channel in our
+ledger paid by another account is a mismatch and trips the switch. With `--post`, the calls go
+through `FlopPolicy.submit_extrinsic` and the ledger records recovering → refunded / settled.
+Without it, the command prints the call and deadline (`flop channel finalize <id>` for finalize; the
+CLI has no expire/timeout command).
+
+### New open questions
+
+- **S11.** Is `computeChannel.timeout` valid for an `Open` channel that has delivered output? The
+  pallet doc says "posted no settlement"; we follow the SDK (`opened_at + max_duration`).
+- **S12.** After an SDK-side refund, `session run` exits non-zero but the escrow is back. The ledger
+  keeps the row `failed` (counted at `max_flop`) because the CLI doesn't say which outcome happened.
+  It needs the `Settled`/`TimedOutRefunded` event by tx (S6).
+
+### Going live (testnet, 3 November): commands in order, all dry runs first
+
+Prerequisites outside this repo:
+- Docker (or Node 22+) on the droplet.
+- FLOP's testnet genesis hash, HTTPS RPC URL and CLI build (S2/S5).
+- At least one testnet miner with a public session endpoint (S3).
+- `/etc/flopstar/flop.toml` from `deploy/flop.example.toml`, with `[testnet]` filled in.
+
+```bash
+export FLOPSTAR_FLOP_NETWORK=testnet FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
+flopstar flop config                         # genesis pinned? caps and miners as intended?
+flopstar flop status                         # genesis "matches pin", spec supported, healthy
+flopstar flop wallet setup                   # review, then:  wallet setup --post
+flopstar flop faucet                         # review, then:  faucet --post
+flopstar flop status                         # spend balance arrived
+flopstar flop ask --model <m> --prompt 'Reply OK.' --purpose research-notes --max-flop 0.01
+                                             # review plan, then add --post (one request)
+flopstar flop recovery                       # nothing due
+flopstar flop touchstone status && flopstar flop touchstone check
+flopstar flop touchstone register --chain-account <spend SS58>   # then --post
+flopstar flop run                            # review the plan, then enable the timers
+```
 
