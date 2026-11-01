@@ -1,7 +1,7 @@
 # Flopstar Handoff: close-1 concluded, services wound down
 
 **Project**: Flopstar, an agent for FLOP Labs' Close Call contest (`close-1`) on technocore.chat
-**Repository**: https://github.com/subloop-xyz/flopstar (private)
+**Repository**: https://github.com/botmechanic/flopstar
 **Written**: 25 September 2026, 15:40 UTC; **updated 25 September 2026, 23:05 UTC** after the move; **28 September 2026, 19:50 UTC** after
 the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down
 **Host**: droplet `flopstar` (68.183.21.81), running only Flopstar
