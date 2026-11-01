@@ -1,7 +1,7 @@
 # Flopstar Handoff: close-1 concluded, services wound down
 
 **Project**: Flopstar, an agent for FLOP Labs' Close Call contest (`close-1`) on technocore.chat
-**Repository**: https://github.com/botmechanic/flopstar
+**Repository**: https://github.com/oversight-markets/flopstar
 **Written**: 25 September 2026, 15:40 UTC; **updated 25 September 2026, 23:05 UTC** after the move; **28 September 2026, 19:50 UTC** after
 the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down
 **Host**: droplet `flopstar` (68.183.21.81), running only Flopstar
@@ -106,7 +106,7 @@ curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin s
 The repo is private. Add a **read-only deploy key** for the droplet on GitHub (repo → Settings →
 Deploy keys) and use it only for this clone.
 ```bash
-git clone git@github.com:subloop-xyz/flopstar.git /opt/flopstar
+git clone git@github.com:oversight-markets/flopstar.git /opt/flopstar
 git -C /opt/flopstar config core.hooksPath .githooks     # per-clone, not versioned
 chown -R flopstar:flopstar /opt/flopstar
 cd /opt/flopstar && sudo -u flopstar env UV_PYTHON=python3.12 UV_CACHE_DIR=/opt/flopstar/.cache/uv uv sync --frozen

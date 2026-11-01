@@ -34,7 +34,7 @@ Security measures:
 
 ```bash
 # Clone the repository
-git clone https://github.com/botmechanic/flopstar.git
+git clone https://github.com/oversight-markets/flopstar.git
 cd flopstar
 
 # Install dependencies
