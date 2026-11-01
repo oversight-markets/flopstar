@@ -22,7 +22,6 @@ import ipaddress
 import json
 import os
 import socket
-import stat
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -31,6 +30,9 @@ from urllib.parse import urlparse
 
 import httpx
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from .secretfiles import SecretFileError
+from .secretfiles import read_secret_file as _read_secret_file
 
 # SPEC: Touchstone's API is being updated in parallel; bump this with any wire change and run
 # `flopstar flop touchstone check` against its /openapi.json.
@@ -90,18 +92,11 @@ class UnsafeURL(TouchstoneConfigError):
 # ---- settings ---------------------------------------------------------------------------------
 
 def read_secret_file(path: Path, what: str) -> bytes:
-    """Read an owner-only (no group/other bits) secret file, refusing anything looser."""
+    """An owner-only file or a systemd credential (secretfiles.py); refuses anything looser."""
     try:
-        st = path.stat()
-    except FileNotFoundError:
-        raise TouchstoneConfigError(f"{what} file {path} does not exist") from None
-    if not stat.S_ISREG(st.st_mode):
-        raise TouchstoneConfigError(f"{what} file {path} is not a regular file")
-    if st.st_mode & 0o077:
-        raise TouchstoneConfigError(f"{what} file {path} must be mode 0600 (is {st.st_mode & 0o777:o})")
-    if st.st_uid != os.getuid():
-        raise TouchstoneConfigError(f"{what} file {path} is not owned by this user")
-    return path.read_bytes()
+        return _read_secret_file(path, what)
+    except SecretFileError as e:
+        raise TouchstoneConfigError(str(e)) from None
 
 
 @dataclass(frozen=True)

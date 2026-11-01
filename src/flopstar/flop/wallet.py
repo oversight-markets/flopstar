@@ -22,6 +22,7 @@ from substrateinterface import Keypair, KeypairType
 
 from ..signer import expected_did
 from .config import FlopConfig
+from .secretfiles import SecretFileError, read_secret_file
 
 KEYSTORE_NAME = "flopstar-spend"
 
@@ -43,12 +44,13 @@ def identity_account(did: str | None = None) -> str:
 
 
 def read_passphrase(cfg: FlopConfig, confirm: bool = False) -> str:
-    """Spend-keystore passphrase from FLOPSTAR_FLOP_PASSPHRASE_FILE (owner-only), else a prompt."""
+    """Passphrase from FLOPSTAR_FLOP_PASSPHRASE_FILE (owner-only or a systemd credential), else a prompt."""
     if cfg.passphrase_file:
-        st = cfg.passphrase_file.stat()
-        if st.st_mode & 0o077:
-            raise WalletError(f"{cfg.passphrase_file} must be mode 0600")
-        value = cfg.passphrase_file.read_text().rstrip("\r\n")
+        try:
+            raw = read_secret_file(cfg.passphrase_file, "spend keystore passphrase")
+        except SecretFileError as e:
+            raise WalletError(str(e)) from None
+        value = raw.decode().rstrip("\r\n")
     else:
         value = getpass.getpass("FLOP spend keystore passphrase: ")
         if confirm and getpass.getpass("Repeat passphrase: ") != value:
