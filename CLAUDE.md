@@ -40,6 +40,8 @@ CLI (`src/flopstar/cli.py`, entry point `flopstar`):
 | `uv run flopstar trader run --live` | yes: posts the tree's trades (tree seed) |
 | `uv run flopstar trader register [--post]` | only with `--post` (tree seed) |
 | `uv run flopstar flop config [--json]` | no; FLOP network profile, caps, paths |
+| `uv run flopstar flop touchstone status\|check` | no (`check` GETs Touchstone's /openapi.json) |
+| `uv run flopstar flop touchstone register\|replay [--post]` | sends to Touchstone only with `--post` |
 
 Every signing command is a dry run unless `--post` (or, for the trader, `--live`) is given.
 **Never run a `--post` or `--live` command, `room claim`, or `tree init` without explicit
@@ -101,6 +103,9 @@ Env vars: `FLOPSTAR_KEY_PATH` (default `~/.config/flopstar/flopstar.pem`),
   example `deploy/flop.example.toml`) + `FLOPSTAR_FLOP_NETWORK`; every cap is explicit and amounts
   are int base units / decimal strings (`flop/amounts.py`), never floats. Never pass a secret to
   `flop_sdk.SubstrateOptions.seed` (it derives from the public dev phrase; FLOP.md §2.3).
+  Key design A: the owner key does nothing on FLOP; a capped spend account pays. Only
+  `flop/policy.py` (FlopPolicy) may sign; the spend ledger is append-only by SQLite triggers;
+  `data/KILL-flop` stops all FLOP actions until a human removes it (FLOP.md §12).
 
 ## Secrets
 

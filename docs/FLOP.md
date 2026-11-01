@@ -5,7 +5,11 @@ Touchstone). Researched 2026-11-01 from the published packages' **source**, FLOP
 read-only probes of devnet from the Flopstar droplet. Everything below is cited; anything not
 confirmed by a source is listed as a `SPEC:` question in §9.
 
-> **Status: stopped before Phase 2 for a key-design decision (§7).** The published code does not
+> **Decision (2026-11-01): key design A (§7).** The owner key does nothing on FLOP until FLOP
+> publishes the DID-signed flow (S1); a separate capped spend account pays escrow. Phases 0–2 and 7
+> are built (§12); Phases 3–6 are next.
+>
+> Original stop note: the published code does not
 > match the brief's key model: nothing links a `did:key` to a chain account, the faucet is not
 > authenticated by identity, direct-session request signing uses a fresh per-channel key (not the
 > DID key), and on-chain session-key caps cannot be applied to direct sessions with any published
@@ -224,7 +228,7 @@ key a spending key. That is the brief's stop condition.
 - **`Proxy`** (stock Substrate): delegation by proxy type, no amount caps.
 - **A separate hot account**: its balance is the hard cap. Works with `session run --keystore` today.
 
-## 7. Key design: proposal, pending your decision
+## 7. Key design (A chosen 2026-11-01)
 
 Roles:
 
@@ -322,3 +326,63 @@ ciphertext and hashes.
    never calls it and its units never set those variables.
 8. The gateway's 402 response names a payment `destination` of `5GrwvaEF…5N8F`. Flopstar never pays
    an address taken from a response.
+
+## 12. Implementation status
+
+| Phase | Module | State |
+|---|---|---|
+| 1 | `flop/config.py`, `flop/amounts.py` | done: per-network profiles, explicit caps (decimal strings, floats refused), SS58 blocklist matched by public key, testnet refuses until its genesis is pinned |
+| 2 | `flop/ledger.py`, `flop/policy.py` | done (below) |
+| 7 | `flop/touchstone.py` | done (below); schema provisional until `touchstone check` passes against the real service |
+| 3–6 | wallet, faucet, inference, recovery, tasks | not started |
+
+**Ledger** (`data/flopstar.db`, tables `flop_spend`, `flop_spend_events`, `flop_faucet_draws`). SQLite
+triggers make it append-only. Core columns (`ts, network, route, model, max_flop, purpose,
+request_sha256`) never change. Result columns (`miner, channel_id, settled_flop, settlement_tx,
+response_sha256, receipt_json, verification, touchstone_reported_at`) go from NULL to a value once.
+`status` may only change to the status of a newly appended event. Allowed transitions:
+prepared→sent|failed, sent→settled|refunded|failed|recovering, failed→recovering,
+recovering→refunded|settled|failed.
+
+**Caps** are rolling windows (24 h for spend and faucet draws, 1 h for request count), checked in
+the same `BEGIN IMMEDIATE` transaction that inserts the `prepared` row. Spend counts `max_flop` in
+full until a row is refunded (0) or settled (`settled_flop`). A request that failed before it was
+sent counts 0. Every attempt counts toward the hourly request cap. Transaction fees are not counted
+(they're not in `max_flop`).
+
+**FlopPolicy** is the only module that may sign; a test greps the package for signing calls
+anywhere else. Its extrinsic allowlist is currently `ComputeChannel.{expire_force_open, timeout,
+finalize}` for `recovery`. Each signature goes through: kill-switch check → pinned-genesis check
+against `chain_getBlockHash(0)` → compose/sign/submit with `wait_for_inclusion` → success required.
+Any failure, any cap or allowlist breach, and any recovery request for a channel not in our ledger
+appends a reason to `data/KILL-flop`. The `check_*` methods are pure (dry runs and pre-checks never
+trip it). Direct-route signatures made by the CLI subprocess are logged with `log_cli_signature`.
+
+**Touchstone reporter.** Settings: `TOUCHSTONE_API_URL`, `TOUCHSTONE_API_TOKEN_FILE` and
+`TOUCHSTONE_STREAK_KEY_FILE`. Both files must be owner-only (no group/other bits) and owned by the
+running user. A raw `TOUCHSTONE_API_TOKEN` env var is refused. Commands: `flopstar flop touchstone
+status | register [--post] [--chain-account SS58] | check | replay [--post]`.
+
+- Plain `http://` is sent only if the host resolves solely to 10/8, 172.16/12, 192.168/16,
+  100.64/10 (Tailscale), loopback or fc00::/7. Python's `is_private` is deliberately not used,
+  because it also admits documentation and reserved ranges. Redirects are never followed. Public
+  `https://` works but warns.
+- `report()` never raises. It replays the buffer oldest-first, stops at the first failure, and
+  queues the new record behind any backlog. Only a 2xx marks `touchstone_reported_at`.
+- `client_digest` = sha256 of the canonical JSON (sorted keys, compact) of the payload without
+  `request_enc`, `response_enc` and `client_digest`. That makes it identical for every rebuild of
+  the same turn, even though each encryption uses a fresh nonce.
+- We add `schema_version` (`flopstar.touchstone.v0`) to both payloads.
+
+Touchstone-side `SPEC:` items (to settle with whoever is updating Touchstone):
+
+- **T1. Streak encryption.** Provisional: AES-256-GCM, 12-byte random nonce, base64 of
+  `nonce‖ciphertext‖tag`, with associated data `flopstar.touchstone.v0|<agent_did>|<channel_id or
+  "">|<turn_index>|request|response`. The key file holds 64 hex characters or 32 raw bytes.
+- **T2.** Does Touchstone accept our extra `schema_version` field, and a null `channel_id`/`miner`
+  for gateway turns?
+- **T3.** Which `chain_account` to register: under design A, the spend account. Should the
+  DID-derived ed25519 account also be listed?
+- **T4.** Idempotency: we assume Touchstone dedupes on `client_digest` and returns 2xx for a
+  duplicate (replays can resend after a crash between send and buffer rewrite).
+

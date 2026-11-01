@@ -15,7 +15,7 @@ def main():
         print("  tree       Key tree: init|dids|dryrun [paths] (never signs or posts)")
         print("  trader     Tree trader: run|status [--live] (paper unless --live); register [--post]")
         print("  verify-key Check the owner key decrypts and matches flopstar.did")
-        print("  flop       FLOP agent: config (see `flopstar flop`)")
+        print("  flop       FLOP agent: config | touchstone (see `flopstar flop`)")
         sys.exit(1)
 
     command = sys.argv[1]
