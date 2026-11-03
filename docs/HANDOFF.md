@@ -4,7 +4,8 @@
 **Repository**: https://github.com/oversight-markets/flopstar
 **Written**: 25 September 2026, 15:40 UTC; **updated 25 September 2026, 23:05 UTC** after the move; **28 September 2026, 19:50 UTC** after
 the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down;
-**1 November 2026, 18:10 UTC** for the FLOP agent (§10)
+**1 November 2026, 18:10 UTC** for the FLOP agent (§10); **3 November 2026** after FLOP opened
+devnet to builders (§10)
 **Host**: droplet `flopstar` (68.183.21.81), running only Flopstar
 **Previous host**: `hoodwatch` (167.99.238.68): decommissioned for Flopstar on 25 Sep; its repo
 clone was deleted and its copies of the key and seed shredded (owner-confirmed)
@@ -18,8 +19,9 @@ the only place where a mistake can't be undone.
 
 **Since 1 Nov 2026 the droplet also hosts the FLOP agent** (`src/flopstar/flop/`): Flopstar buying
 inference on the FLOP Network, with every purchase recorded and reported to Touchstone. It is built,
-deployed and holds a spend account, but it is **parked until FLOP's testnet** (target 3 Nov 2026) and
-spends nothing. State and next steps: **§10**. Design and sources: [FLOP.md](FLOP.md).
+deployed and holds a spend account, but it is **parked until FLOP's testnet** (target 3 Nov 2026,
+not up on the day) and spends nothing. FLOP opened devnet to builders on 3 Nov; that changes no
+blocker (§10). State and next steps: **§10**. Design and sources: [FLOP.md](FLOP.md).
 
 ---
 
@@ -497,14 +499,21 @@ go-live sequence are in [FLOP.md](FLOP.md); this section is the operational stat
 **Decision (owner, 1 Nov):** don't ask FLOP about the open questions; testnet (target Tue 3 Nov,
 not yet live, hostnames don't resolve) should answer them. Until then the agent spends nothing.
 
+**Update, 3 Nov:** FLOP announced devnet is open for builders (explorer, faucet, gateway, MCP, SDK;
+devnet tokens are worthless, earn nothing, and the chain may reset). Re-checked read-only the same
+day (FLOP.md §4.1): every announced link is on FLOP's official-links page; genesis, runtime spec and
+packages are unchanged; still 0 session offers and no published miner endpoints; testnet hostnames
+still don't resolve. `flop status` is healthy (genesis matches pin, kill switch clear, spend balance
+0). Nothing is spendable yet, so the agent stays parked.
+
 | Item | State |
 |---|---|
 | Code | Phases 0–7 complete in `src/flopstar/flop/`, pushed to `main` and deployed to `/opt/flopstar` (venv synced; `flop-sdk==0.2.0`). |
 | Key design | **A**: the owner key (`flopstar.pem`) does nothing on FLOP. A separate sr25519 **spend account** pays escrow; its balance plus FlopPolicy's caps bound spending. Only `flop/policy.py` signs or launches the signing CLI. |
 | Network | **devnet** (earns nothing). `/etc/flopstar/flop.toml` (0640 root:flopstar) is the example config: genesis pinned `0x99c1…d631`, caps 0.01 FLOP/request, 0.5/day, 6 requests/h, 1 faucet draw/day, model `qwen/qwen2.5-0.5b-instruct`, **no miners listed**, empty blocklist. |
 | Spend account | `5C9zWSykX2EHGF6pbRkPGTHrjYcnj2WjQRnm2xbPfye4uUFb`, **0 FLOP**. Keystore and passphrase credential in §2. Verified: decrypts via the credential as `flopstar`. |
-| Faucet | First draw (2026-11-01 18:03 UTC) refused: 429 "IP daily grant budget reached", although this IP had never drawn. Recorded as failed draw #1; kill switch not tripped. |
-| Timers | **One-off** `flopstar-flop-faucet-retry.timer` (enabled, `Persistent=true`) fires `flopstar-flop-faucet.service` once at **2026-11-02 18:10 UTC**. The timer file exists only in `/etc/systemd/system`; **remove it after it fires** (below). The task runner and recovery units (`deploy/flopstar-flop-run.*`, `flopstar-flop-recovery.*`) are **not installed**. |
+| Faucet | Draw #1 (2026-11-01 18:03 UTC): 429 "IP daily grant budget reached", although this IP had never drawn. Draw #2 (the retry timer, 2026-11-02 18:10 UTC) and draw #3 (manual, owner's go-ahead, 2026-11-03): 503 "IP classification unavailable; retry later", no `Retry-After`. All recorded as failed; kill switch not tripped. **Still 0 FLOP.** The 503 is FLOP's IP check failing for this droplet's IP, not our request; retrying more often won't help. |
+| Timers | **No FLOP timers installed.** The one-off `flopstar-flop-faucet-retry.timer` fired on 2 Nov and was disabled and deleted on 3 Nov. The task runner and recovery units (`deploy/flopstar-flop-run.*`, `flopstar-flop-recovery.*`) are **not installed**. |
 | Kill switch | `/var/lib/flopstar/data/KILL-flop`: absent (clear). |
 | Ledger | `flop_spend`, `flop_spend_events`, `flop_faucet_draws` in `/var/lib/flopstar/data/flopstar.db` (append-only via triggers). One row: the failed faucet draw. Signatures/authorisations log: `data/flop-signatures.log`. |
 | Touchstone | Not configured (no `TOUCHSTONE_*` settings or credentials). Reports would be skipped; nothing is buffered. Wire schema `flopstar.touchstone.v0` is provisional (FLOP.md T1–T4). |
@@ -540,11 +549,8 @@ $FLOP status                      # chain identity, health, spend balance, budge
 $FLOP config                      # resolved profile, caps, paths
 $FLOP faucet                      # dry run; --post draws (needs the owner's go-ahead)
 $FLOP recovery                    # channels holding escrow (none yet)
-journalctl -u flopstar-flop-faucet.service          # after tomorrow's retry
+journalctl -u flopstar-flop-faucet.service          # faucet draw results
 cat /var/lib/flopstar/data/KILL-flop                 # exists only if tripped; holds the reasons
-# after the retry has fired:
-systemctl disable --now flopstar-flop-faucet-retry.timer && \
-  rm /etc/systemd/system/flopstar-flop-faucet-retry.timer && systemctl daemon-reload
 ```
 Commands that need the spend passphrase (`wallet`/`ask`/`run`/`recovery --post`) run as a unit or
 `systemd-run` with `LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred`

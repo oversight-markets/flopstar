@@ -15,8 +15,9 @@ and append-only evidence logs. It has two jobs:
    [docs/STATEMENT.md](docs/STATEMENT.md), and every contest service is stopped.
 2. **FLOP agent (Nov 2026, parked for testnet).** Buys useful inference on the FLOP Network, keeps
    a verifiable record of every purchase and reports it to Touchstone, Oversight's verification
-   service. It is built and deployed against devnet, and waits for FLOP's testnet (target
-   3 Nov 2026) before spending anything. See [FLOP Agent](#flop-agent).
+   service. It is built and deployed against devnet (open to builders since 3 Nov 2026; it earns
+   nothing), and waits for FLOP's testnet, or a reachable miner or gateway key, before spending
+   anything. See [FLOP Agent](#flop-agent).
 
 Current operational state for both: [docs/HANDOFF.md](docs/HANDOFF.md) (§1 for the contest, §10
 for the FLOP agent).

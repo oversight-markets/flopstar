@@ -189,6 +189,27 @@ to a small number of institutional partners" (`testnet-and-timeline`).
 miner endpoint (none public, no offers), the gateway needs a funded API key (enrolment needs the
 CLI), and native doesn't exist in Python.
 
+### 4.1 Re-checked 2026-11-03 after FLOP's "devnet is open for builders" post
+
+FLOP Labs posted that devnet is open for builders, listing explorer, faucet, gateway, MCP, the npm
+SDK, docs and `ask.flop.finance`, with the warning that devnet tokens have no value, earn no rewards
+or airdrop weight, and the chain may reset. Read-only checks from the droplet the same day:
+
+| Check | Result |
+|---|---|
+| Links | All match FLOP's [official links page](https://flop.finance/official/) (FLOP Labs, updated 2026-10-23), which `flop.network` links to: `flop.finance` (site), `ask.flop.finance` (docs chatbot), `docs.flop.network`, and `flop.network` for api/mcp/faucet/rpc. No new hosts for Flopstar's config. |
+| Chain | Same genesis `0x99c1…d631`, spec **1014003** (unchanged), finalized ~2.79 M, 11 peers. |
+| Packages | Unchanged: npm `@flop-labs/sdk` / `cli` 0.4.0, `client` 0.2.1 (all 2026-10-29); PyPI `flop-sdk` 0.2.0. |
+| Gateway `/v1/models` | Still one model, `qwen/qwen2.5-0.5b-instruct`, `"0.006"` prompt/completion. New `x-flop.price_sources`: per-miner `devnet-nominal` prices with miner SS58s and ~2-minute expiries, but **no endpoints**. |
+| Session offers | Still **0**. |
+| MCP (`flop-network` 0.2.0) | 34 tools, still read-only for us: no run-session or pay tool. New since §4: `flop_get_inference_receipt` (possible answer to S6), `flop_agent_pack_*`, `flop_knowledge_*`. `flop_generate_secrets` generates HTLC secrets server-side; **never use it** (a secret the server made isn't ours). |
+| Docs status pages | `network-devnet`: "development … administrator-reviewed disposable devnet admission". `network-testnet`: "planned". Testnet hostnames still **don't resolve** on its 3 Nov target date. |
+| Faucet | `/chain` OK. Draws #2 (timer, 2 Nov) and #3 (manual, 3 Nov) both got **503 "IP classification unavailable; retry later"** (failed, no trip). |
+
+Effect on the blockers: none removed. The post settles which way S10 goes for builders (devnet is
+meant to be reachable by agents now), but direct still lacks a miner endpoint (S3), the gateway
+still needs an API key (S4), and testnet isn't up (S2).
+
 ## 5. Identity: did:key, chain accounts, faucet, signed requests
 
 What FLOP says (`testnet-and-timeline`, updated 2026-10-30): an agent needs "an identity key (the
@@ -295,7 +316,9 @@ Alternatives, if FLOP confirms the DID account is what must spend on testnet:
 - **S9. Does `FlopSessionKeys.execute_via_session` admit `ComputeChannel` calls** (`DENIED_PALLETS`
   is not visible in metadata)? Only matters for option B.
 - **S10. Devnet agent access.** The docs say both that agents can reach devnet and that devnet
-  inference is closed to partners.
+  inference is closed to partners. *2026-11-03:* FLOP's post says devnet is open for builders
+  (§4.1); the `network-devnet` page still says admission is administrator-reviewed. Treat devnet as
+  open for reads and faucet draws; paid inference still hits S3/S4.
 
 ## 10. Touchstone network path (Phase 7)
 
