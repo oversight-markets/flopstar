@@ -16,8 +16,9 @@ and append-only evidence logs. It has two jobs:
 2. **FLOP agent (Nov 2026, parked for testnet).** Buys useful inference on the FLOP Network, keeps
    a verifiable record of every purchase and reports it to Touchstone, Oversight's verification
    service. It is built and deployed against devnet (open to builders since 3 Nov 2026; it earns
-   nothing), and waits for FLOP's testnet, or a reachable miner or gateway key, before spending
-   anything. See [FLOP Agent](#flop-agent).
+   nothing), holds 25 devnet FLOP and is **registered with Touchstone**. It waits for a reachable
+   miner or gateway key (or FLOP's testnet) before spending anything. See
+   [FLOP Agent](#flop-agent).
 
 Current operational state for both: [docs/HANDOFF.md](docs/HANDOFF.md) (§1 for the contest, §10
 for the FLOP agent).
@@ -146,8 +147,7 @@ policy's caps bound what a bug could spend.
   floats.
 - **Untrusted output:** inference replies are files for humans, never executed, posted or used to
   sign, and inputs containing key material are refused.
-- **Touchstone reporting:** request/response bytes are encrypted before they leave the server,
-  failed reports buffer and replay in order, and plain HTTP is allowed only on a private network.
+- **Touchstone reporting:** see [Touchstone](#touchstone) below.
 
 **Commands**
 
@@ -160,15 +160,46 @@ uv run flopstar flop ask --model M --prompt TEXT --purpose NAME [--route direct|
 uv run flopstar flop run [--post]            # useful-work tasks: contest-digest, ops-review,
                                              # research-notes (spend only when there is input)
 uv run flopstar flop recovery [--post]       # recover escrow from our own stuck channels
-uv run flopstar flop touchstone status|check|register|replay
+uv run flopstar flop touchstone status                 # settings, network path, backlog
+uv run flopstar flop touchstone check [--spec FILE]    # diff our payloads against Touchstone's spec
+uv run flopstar flop touchstone register [--post]      # register our DID + spend account
+uv run flopstar flop touchstone replay [--post]        # resend buffered reports
 ```
 
 Configuration: `FLOPSTAR_FLOP_CONFIG` (TOML, example `deploy/flop.example.toml`, every cap
 explicit) and `FLOPSTAR_FLOP_NETWORK` (`devnet` | `testnet`); devnet earns nothing.
 
-**Status (1 Nov 2026).** Deployed on the droplet against devnet with a spend account and no funds
-yet (the faucet's per-IP budget refused the first draw). Nothing spends: there are no published
-miner endpoints or gateway keys yet, and testnet isn't live. Details: HANDOFF §10.
+### Touchstone
+
+Touchstone is Oversight's verification service for FLOP inference. Flopstar reports every settled
+purchase to it as a *streak turn* (`POST /v1/streak/turns`), and Touchstone's indexer links the
+on-chain channels Flopstar opens to its agent record by the account that opened them.
+
+- **Registration:** Flopstar is registered as agent `did:key:z6MkjLpU…Bv` with chain account
+  `5C9zWSyk…uUFb` (the spend account, since it opens the channels) and label `flopstar` (3 Nov
+  2026). The one-shot `flopstar-touchstone-register.service` did it and is safe to re-run.
+- **Endpoint:** `https://api.touchstone.gold`, the only route (TLS through Caddy). Plain `http://`
+  is refused unless the host is private; redirects are never followed.
+- **Encryption:** request and response bytes leave the server only encrypted with Flopstar's own
+  streak key, in Touchstone's `aes-256-gcm/v1` format (`0x01 ‖ nonce ‖ ciphertext ‖ tag`, AAD
+  `did + "\n" + client_digest`). Touchstone stores them opaquely and never holds the key; the
+  plaintext SHA-256 of each is sent alongside.
+- **Idempotent:** `client_digest` is Touchstone's SDK digest, and Touchstone dedupes on it, so a
+  resend after a crash records nothing twice. Gateway turns use their ledger id as the turn index
+  so identical prompts stay distinct.
+- **Never blocks inference:** a failed report (network error, non-2xx) is appended to
+  `data/touchstone-buffer.jsonl` and replayed oldest-first before anything new. A ledger row is
+  marked reported only on a 2xx.
+- **Schema checked:** payloads carry exactly Touchstone's `TurnRecord` and `AgentCreate` fields;
+  a test diffs them against Touchstone's published spec
+  (`tests/fixtures/touchstone-openapi-c00367e.json`) and `touchstone check --spec` does the same
+  against a newer copy.
+- **Secrets:** the shared API bearer token and the streak key are systemd encrypted credentials
+  on the droplet; a raw token in the environment is refused.
+
+**Status (3 Nov 2026).** Deployed on the droplet against devnet. The spend account holds 25 devnet
+FLOP from the faucet, and Flopstar is registered with Touchstone. Nothing spends yet: there are no
+published miner endpoints or gateway keys, and testnet isn't live. Details: HANDOFF §10.
 
 ## Investigation: Flow Room Data
 
@@ -183,6 +214,76 @@ The full per-sweep record is in the **flow file** referenced by the hash, which 
 (issue #6), so full-ledger replay is still blocked.
 
 ## Architecture
+
+```mermaid
+flowchart LR
+    subgraph droplet["Flopstar droplet (systemd, user flopstar)"]
+        direction TB
+        creds[("systemd encrypted credentials<br/>owner passphrase · tree seed<br/>spend passphrase · Touchstone token · streak key")]
+
+        subgraph contest["Close Call contest (concluded, services stopped)"]
+            direction TB
+            monitor["monitor.py<br/>read-only, verifies referee sigs"]
+            store[("SQLite store<br/>append-only")]
+            trader["trader.py<br/>shadow fold + 64-key tree"]
+            treesigner["TreeSigner<br/>64 HKDF tree keys"]
+            policysigner["PolicySigner<br/>owner key: room, heartbeat"]
+            fold["vendor/close-call<br/>fold (unmodified)"]
+            monitor --> store --> trader
+            trader --> fold
+            trader --> treesigner
+        end
+
+        subgraph flop["FLOP agent (parked for testnet)"]
+            direction TB
+            tasks["tasks.py / ask<br/>useful-work tasks"]
+            inference["inference.py<br/>direct · gateway"]
+            policy["FlopPolicy<br/>caps · allowlists · kill switch"]
+            ledger[("spend ledger<br/>append-only")]
+            cli["pinned flop CLI<br/>(container, memory-capped)"]
+            reporter["touchstone.py<br/>encrypt · buffer · replay"]
+            tasks --> inference --> policy
+            policy --> ledger
+            policy --> cli
+            inference --> reporter
+        end
+        creds -.-> treesigner
+        creds -.-> policysigner
+        creds -.-> policy
+        creds -.-> reporter
+    end
+
+    subgraph technocore["technocore.chat"]
+        referee["referee rooms<br/>d-close1-*"]
+        rooms["close1 · d-flopstar-close1"]
+    end
+    hl["Hyperliquid<br/>xyz:NVDA"]
+
+    subgraph flopnet["FLOP Network (devnet)"]
+        chain["chain RPC<br/>escrow channels"]
+        miner["miners / gateway"]
+        faucet["faucet"]
+    end
+
+    subgraph ts["Touchstone (api.touchstone.gold)"]
+        api["API<br/>/v1/agents · /v1/streak/turns"]
+        indexer["indexer<br/>channels by spend account"]
+    end
+
+    referee -- long-poll + export --> monitor
+    hl -- last trade --> trader
+    treesigner -- signed trades --> rooms
+    policysigner -- registration · heartbeat --> rooms
+    cli -- open channel, verify receipt --> miner
+    cli --> chain
+    policy -- draw --> faucet
+    reporter -- "HTTPS, bearer token,<br/>aes-256-gcm/v1 turns" --> api
+    chain -.-> indexer
+```
+
+The owner key (`flopstar.pem`) never trades and never touches FLOP. Tree keys trade only through
+`TreeSigner`; the spend account signs only through `FlopPolicy`; Touchstone sees only ciphertext
+and hashes.
 
 ```
 src/flopstar/
@@ -214,7 +315,7 @@ src/flopstar/
     ├── inference.py  - direct (CLI) and gateway routes, plan/execute
     ├── tasks.py      - Useful-work tasks and the secret guard
     ├── recovery.py   - Permissionless channel recovery (expire_force_open, timeout, finalize)
-    ├── touchstone.py - Encrypted, buffered reporting to Touchstone
+    ├── touchstone.py - Touchstone wire schema, aes-256-gcm/v1, buffered reporting
     ├── secretfiles.py- Owner-only files or systemd credentials
     └── cli.py        - `flopstar flop ...`
 ```
@@ -264,8 +365,10 @@ uv run pytest tests/test_fold_conformance.py -v
 
 The conformance test verifies the vendored fold produces expected output on `sample-season.jsonl`.
 
-The suite has 198 tests. The FLOP tests use throwaway keys, mocked transports and a fake CLI runner.
-None touches the owner key, the tree seed or a live network. The `flop session run` fixtures in
+The suite has 204 tests. The FLOP tests use throwaway keys, mocked transports and a fake CLI runner.
+None touches the owner key, the tree seed or a live network. The Touchstone tests check our
+payloads against a pinned copy of Touchstone's OpenAPI spec and decrypt our blobs the way
+Touchstone's helper would. The `flop session run` fixtures in
 `tests/fixtures/flop/` are **synthetic** (shaped from the CLI's source) until real devnet output can
 be captured.
 
@@ -293,9 +396,11 @@ Flopstar runs on a dedicated droplet under systemd, as a non-root `flopstar` use
 passphrase and the tree seed exist there only as systemd encrypted credentials. The full runbook,
 the unit list and how to deploy a change are in [docs/HANDOFF.md](docs/HANDOFF.md) (§3 and §7).
 
-The FLOP agent's units are in `deploy/`: `flopstar-flop-run.*` (task runner, three times a day),
-`flopstar-flop-recovery.*` (hourly) and `flopstar-flop-faucet.service` (one draw). They are
-examples, not installed by default; their state on the droplet is in HANDOFF §10.
+The FLOP agent's units are in `deploy/`: `flopstar-flop-run.*` (task runner, three times a day,
+with the Touchstone settings), `flopstar-flop-recovery.*` (hourly), `flopstar-flop-faucet.service`
+(one draw) and `flopstar-touchstone-register.service` (one-shot registration; installed and run on
+3 Nov). The task runner and recovery units are not installed yet; their state on the droplet is in
+HANDOFF §10.
 
 Never transport the key or the seed through git, Slack, email, or logs.
 
