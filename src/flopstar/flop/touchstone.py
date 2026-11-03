@@ -36,41 +36,41 @@ from .secretfiles import read_secret_file as _read_secret_file
 
 # SPEC: Touchstone's API is being updated in parallel; bump this with any wire change and run
 # `flopstar flop touchstone check` against its /openapi.json.
-SCHEMA_VERSION = "flopstar.touchstone.v0"
+SCHEMA_VERSION = "flopstar.touchstone.v1"
 TURNS_PATH = "/v1/streak/turns"
 AGENTS_PATH = "/v1/agents"
 
 # Our payloads as JSON-schema type names (a list means any of them). The `check` command diffs these
 # against Touchstone's published request schemas.
+# Exactly Touchstone's TurnRecord (web/openapi.json at c00367e), minus fields we have no value for
+# (model_identity needs registry hashes; prompt_token_ids, settlement_tx). Touchstone silently
+# drops undeclared fields, so model/miner/network live only in our ledger; the channel ties a turn
+# to its miner on chain.
 TURN_FIELDS: dict[str, str | list[str]] = {
-    "schema_version": "string",
     "agent_did": "string",
     "channel_id": ["string", "null"],  # the gateway route has no channel
     "turn_index": "integer",
     "route": "string",
-    "model": "string",
-    "miner": ["string", "null"],
+    "enc_scheme": "string",
     "request_enc": "string",
     "response_enc": "string",
     "request_sha256": "string",
     "response_sha256": "string",
     "token_ids": ["array", "null"],
-    "timings": "object",
+    "timings": "object",  # values must be ints
     "receipt": ["object", "null"],
-    "sdk_verification": "string",
-    "sdk_version": "string",
-    "cli_version": ["string", "null"],
-    "network": "string",
-    "client_digest": "string",
+    "sdk": "object",  # {name, version}
+    "sdk_verification": ["object", "null"],  # {ok, message?, error_kind?}; null = not SDK-checked
     "recorded_at": "string",
+    "client_digest": "string",
 }
+# Touchstone's AgentCreate (main @ c00367e): {did, account_ss58, label}. Registering a DID twice
+# returns 400 "already exists", which `register` treats as success.
 AGENT_FIELDS: dict[str, str | list[str]] = {
-    "agent_did": "string",
-    "chain_account": "string",
+    "did": "string",
+    "account_ss58": "string",
     "label": "string",
 }
-# Excluded from client_digest: ciphertexts use a fresh nonce each time, and the digest itself.
-_UNDIGESTED = ("request_enc", "response_enc", "client_digest")
 
 # Explicit, not ipaddress.is_private: that also admits documentation/benchmark/reserved ranges.
 PRIVATE_NETWORKS = tuple(ipaddress.ip_network(n) for n in (
@@ -129,8 +129,14 @@ class TouchstoneSettings:
 
 
 def parse_streak_key(data: bytes) -> bytes:
-    """SPEC: key file format is ours to choose until Touchstone says otherwise: 64 hex chars or 32 raw bytes."""
+    """32 bytes as base64 (Touchstone's TOUCHSTONE_STREAK_KEY_FILE format), 64 hex chars, or raw."""
     text = data.strip()
+    try:
+        key = base64.b64decode(text, validate=True)
+        if len(key) == 32:
+            return key
+    except ValueError:
+        pass
     if len(text) == 64:
         try:
             return bytes.fromhex(text.decode())
@@ -180,12 +186,14 @@ def check_url(url: str, resolve: Callable = socket.getaddrinfo) -> list[str]:
 
 class StreakCipher:
     """
-    SPEC: algorithm and associated data must match Touchstone's decryptor. Provisional choice:
-    AES-256-GCM, 12-byte random nonce, output nonce || ciphertext || tag, base64; the AAD binds the
-    ciphertext to its agent, channel, turn and field so it cannot be replayed as another record.
+    Touchstone's `aes-256-gcm/v1` (touchstone_streak/crypto.py, streak-bridge/src/streak-key.ts):
+    base64 of 0x01 || 12-byte random nonce || ciphertext || 16-byte tag, AAD = UTF-8 of
+    `agent_did + "\n" + client_digest`. Request and response share the AAD (Touchstone's helpers add
+    no direction tag); a swap is caught by request_sha256/response_sha256, which we always send.
     """
 
-    SCHEME = "aes-256-gcm/v0"
+    SCHEME = "aes-256-gcm/v1"
+    VERSION = b"\x01"
 
     def __init__(self, key: bytes):
         if len(key) != 32:
@@ -193,16 +201,18 @@ class StreakCipher:
         self._aead = AESGCM(key)
 
     @staticmethod
-    def aad(agent_did: str, channel_id: str | None, turn_index: int, field: str) -> bytes:
-        return f"{SCHEMA_VERSION}|{agent_did}|{channel_id or ''}|{turn_index}|{field}".encode()
+    def aad(agent_did: str, digest: str) -> bytes:
+        return f"{agent_did}\n{digest}".encode()
 
     def encrypt(self, data: bytes, aad: bytes) -> str:
         nonce = os.urandom(12)
-        return base64.b64encode(nonce + self._aead.encrypt(nonce, data, aad)).decode()
+        return base64.b64encode(self.VERSION + nonce + self._aead.encrypt(nonce, data, aad)).decode()
 
     def decrypt(self, blob: str, aad: bytes) -> bytes:
         raw = base64.b64decode(blob)
-        return self._aead.decrypt(raw[:12], raw[12:], aad)
+        if raw[:1] != self.VERSION:
+            raise ValueError(f"not an {self.SCHEME} blob")
+        return self._aead.decrypt(raw[1:13], raw[13:], aad)
 
 
 # ---- payloads ---------------------------------------------------------------------------------
@@ -211,16 +221,21 @@ def canonical(obj) -> bytes:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
-def client_digest(payload: dict) -> str:
-    """sha256 over the canonical record minus ciphertexts: identical for every rebuild of a turn."""
-    return hashlib.sha256(canonical({k: v for k, v in payload.items()
-                                     if k not in _UNDIGESTED})).hexdigest()
+def client_digest(route: str, channel_id: str | None, turn_index: int | None,
+                  request_sha256: str) -> str:
+    """Touchstone's SDK digest: sha256 hex of `route|channel_id or ""|turn_index or ""|req sha256`.
+
+    Touchstone dedupes on it, so two turns with the same route, channel, index and request bytes are
+    one record; callers must give each turn a distinct (channel_id, turn_index).
+    """
+    index = "" if turn_index is None else str(turn_index)
+    return hashlib.sha256(
+        f"{route}|{channel_id or ''}|{index}|{request_sha256}".encode()).hexdigest()
 
 
 def build_turn(*, cipher: StreakCipher, agent_did: str, spend: dict, turn_index: int,
                request_bytes: bytes, response_bytes: bytes, token_ids: list[int] | None,
-               timings: dict, receipt: dict | None, sdk_version: str, cli_version: str | None,
-               recorded_at: str) -> dict:
+               timings: dict, receipt: dict | None, sdk_version: str, recorded_at: str) -> dict:
     """One `POST /v1/streak/turns` body from a ledger row and the exact bytes exchanged."""
     request_sha = hashlib.sha256(request_bytes).hexdigest()
     response_sha = hashlib.sha256(response_bytes).hexdigest()
@@ -231,36 +246,58 @@ def build_turn(*, cipher: StreakCipher, agent_did: str, spend: dict, turn_index:
     if token_ids is not None and not all(type(t) is int and t >= 0 for t in token_ids):
         raise ValueError("token_ids must be non-negative ints")
     channel = spend.get("channel_id")
+    if spend["route"] == "direct" and not channel:
+        raise ValueError(f"spend {spend['id']}: direct route needs a channel_id")
+    digest = client_digest(spend["route"], channel, turn_index, request_sha)
+    aad = cipher.aad(agent_did, digest)
     payload = {
-        "schema_version": SCHEMA_VERSION,
         "agent_did": agent_did,
         "channel_id": channel,
         "turn_index": turn_index,
         "route": spend["route"],
-        "model": spend["model"],
-        "miner": spend.get("miner"),
-        "request_enc": cipher.encrypt(request_bytes,
-                                      cipher.aad(agent_did, channel, turn_index, "request")),
-        "response_enc": cipher.encrypt(response_bytes,
-                                       cipher.aad(agent_did, channel, turn_index, "response")),
+        "enc_scheme": cipher.SCHEME,
+        "request_enc": cipher.encrypt(request_bytes, aad),
+        "response_enc": cipher.encrypt(response_bytes, aad),
         "request_sha256": request_sha,
         "response_sha256": response_sha,
         "token_ids": token_ids,
-        "timings": timings,
+        "timings": int_timings(timings),
         "receipt": receipt,
-        "sdk_verification": spend.get("verification") or "unverified",
-        "sdk_version": sdk_version,
-        "cli_version": cli_version,
-        "network": spend["network"],
+        "sdk": {"name": "flop-sdk", "version": sdk_version},
+        "sdk_verification": sdk_verdict(spend.get("verification")),
         "recorded_at": recorded_at,
+        "client_digest": digest,
     }
-    payload["client_digest"] = client_digest(payload)
     validate(payload, TURN_FIELDS)
     return payload
 
 
+def int_timings(timings: dict) -> dict[str, int]:
+    """Touchstone's timings are {str: int}: an ISO `started_at` becomes `started_at_ms` (epoch ms)."""
+    from datetime import datetime
+    out = {}
+    for key, value in timings.items():
+        if key == "started_at" and isinstance(value, str):
+            out["started_at_ms"] = int(datetime.fromisoformat(value).timestamp() * 1000)
+        elif type(value) is int:
+            out[key] = value
+        else:
+            raise ValueError(f"timing {key!r} is not an int")
+    return out
+
+
+def sdk_verdict(verification: str | None) -> dict | None:
+    """The FLOP SDK's own verdict; null when the SDK never checked the turn (gateway route)."""
+    if verification == "sdk_verified":
+        return {"ok": True}
+    if verification == "failed":
+        return {"ok": False, "error_kind": "verification_failed"}
+    return None
+
+
 def agent_payload(agent_did: str, chain_account: str) -> dict:
-    payload = {"agent_did": agent_did, "chain_account": chain_account, "label": "flopstar"}
+    """`chain_account` is the spend account: Touchstone's indexer links channels by their opener."""
+    payload = {"did": agent_did, "account_ss58": chain_account, "label": "flopstar"}
     validate(payload, AGENT_FIELDS)
     return payload
 
@@ -278,6 +315,11 @@ def validate(payload: dict, schema: dict) -> None:
         value = payload[key]
         if not any(type(value) is _PY_TYPES[t] for t in allowed):
             raise ValueError(f"{key} must be {allowed}, got {type(value).__name__}")
+
+
+def already_registered(status_code: int, body: str) -> bool:
+    """Touchstone answers a repeat registration with 400 "... already exists"; that is success."""
+    return status_code == 400 and "already exists" in body.lower()
 
 
 # ---- schema check against Touchstone's OpenAPI --------------------------------------------------

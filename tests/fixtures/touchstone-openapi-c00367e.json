@@ -1,0 +1,1903 @@
+{
+  "components": {
+    "schemas": {
+      "AgentCreate": {
+        "description": "Agent creation request.",
+        "properties": {
+          "account_ss58": {
+            "title": "Account Ss58",
+            "type": "string"
+          },
+          "delegate_key_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegate Key Ref"
+          },
+          "did": {
+            "title": "Did",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "probe_budget_pct": {
+            "default": 0.05,
+            "title": "Probe Budget Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "did",
+          "account_ss58"
+        ],
+        "title": "AgentCreate",
+        "type": "object"
+      },
+      "AgentResponse": {
+        "description": "Agent response.",
+        "properties": {
+          "account_ss58": {
+            "title": "Account Ss58",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "delegate_key_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delegate Key Ref"
+          },
+          "did": {
+            "title": "Did",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "probe_budget_pct": {
+            "title": "Probe Budget Pct",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "did",
+          "account_ss58",
+          "label",
+          "delegate_key_ref",
+          "probe_budget_pct",
+          "created_at"
+        ],
+        "title": "AgentResponse",
+        "type": "object"
+      },
+      "AssayEnqueued": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "job_id"
+        ],
+        "title": "AssayEnqueued",
+        "type": "object"
+      },
+      "ChainHead": {
+        "description": "Last finalized block the indexer has processed.",
+        "properties": {
+          "block_hash": {
+            "title": "Block Hash",
+            "type": "string"
+          },
+          "finalized_block": {
+            "title": "Finalized Block",
+            "type": "integer"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network"
+          },
+          "spec_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec Version"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finalized_block",
+          "block_hash",
+          "updated_at",
+          "network",
+          "spec_version"
+        ],
+        "title": "ChainHead",
+        "type": "object"
+      },
+      "DisputeCreate": {
+        "properties": {
+          "contested_turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contested Turn"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "DisputeCreate",
+        "type": "object"
+      },
+      "DisputeDraft": {
+        "description": "Preview of an unsigned `open_dispute` call. Computing it writes nothing.",
+        "properties": {
+          "bond_required": {
+            "examples": [
+              "100000000000000000000"
+            ],
+            "pattern": "^-?[0-9]+$",
+            "title": "Bond Required",
+            "type": "string"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "contested_turn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contested Turn"
+          },
+          "disputes_enabled": {
+            "title": "Disputes Enabled",
+            "type": "boolean"
+          },
+          "fineness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FinenessSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          },
+          "soft_tier_dispute_lane": {
+            "title": "Soft Tier Dispute Lane",
+            "type": "string"
+          },
+          "unsigned_call": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unsigned Call"
+          }
+        },
+        "required": [
+          "session_id",
+          "channel_id",
+          "contested_turn",
+          "bond_required",
+          "disputes_enabled",
+          "soft_tier_dispute_lane",
+          "ready",
+          "reasons",
+          "fineness",
+          "unsigned_call"
+        ],
+        "title": "DisputeDraft",
+        "type": "object"
+      },
+      "DisputeRecord": {
+        "properties": {
+          "dispute_id": {
+            "title": "Dispute Id",
+            "type": "integer"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/DisputeDraft"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dispute_id",
+          "status",
+          "draft"
+        ],
+        "title": "DisputeRecord",
+        "type": "object"
+      },
+      "FinenessSummary": {
+        "properties": {
+          "ev_flop": {
+            "examples": [
+              "100000000000000000000"
+            ],
+            "pattern": "^-?[0-9]+$",
+            "title": "Ev Flop",
+            "type": "string"
+          },
+          "gate_passed": {
+            "title": "Gate Passed",
+            "type": "boolean"
+          },
+          "karats": {
+            "title": "Karats",
+            "type": "integer"
+          },
+          "p_upheld": {
+            "title": "P Upheld",
+            "type": "number"
+          }
+        },
+        "required": [
+          "p_upheld",
+          "karats",
+          "ev_flop",
+          "gate_passed"
+        ],
+        "title": "FinenessSummary",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ModelIdentity": {
+        "description": "What the session/receipt claimed to serve (checked later against the model registry).",
+        "properties": {
+          "backend_model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend Model Name"
+          },
+          "decode_policy_hash": {
+            "title": "Decode Policy Hash",
+            "type": "string"
+          },
+          "measured_root": {
+            "title": "Measured Root",
+            "type": "string"
+          },
+          "model_hash": {
+            "title": "Model Hash",
+            "type": "string"
+          },
+          "precision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Precision"
+          },
+          "registry_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Model"
+          },
+          "registry_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Version"
+          },
+          "requested_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Slug"
+          }
+        },
+        "required": [
+          "model_hash",
+          "measured_root",
+          "precision",
+          "decode_policy_hash"
+        ],
+        "title": "ModelIdentity",
+        "type": "object"
+      },
+      "NetworkInfo": {
+        "description": "The network the indexer follows (from its cursor) and its pinned config.",
+        "properties": {
+          "genesis_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genesis Hash"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rpc_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpc Url"
+          },
+          "spec_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec Version"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "rpc_url",
+          "genesis_hash",
+          "spec_version"
+        ],
+        "title": "NetworkInfo",
+        "type": "object"
+      },
+      "ParamValue": {
+        "description": "One parameter. Values are strings; raw FLOP amounts use unit \"planck\".",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "live",
+              "draft",
+              "documented_not_wired",
+              "unknown",
+              "local"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "unit",
+          "status",
+          "source_url",
+          "as_of",
+          "note"
+        ],
+        "title": "ParamValue",
+        "type": "object"
+      },
+      "RecoveryActionOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "available_at_block": {
+            "title": "Available At Block",
+            "type": "integer"
+          },
+          "blocks_until_available": {
+            "title": "Blocks Until Available",
+            "type": "integer"
+          },
+          "call": {
+            "title": "Call",
+            "type": "string"
+          },
+          "cli_command": {
+            "title": "Cli Command",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "unsigned_call": {
+            "additionalProperties": true,
+            "title": "Unsigned Call",
+            "type": "object"
+          }
+        },
+        "required": [
+          "call",
+          "available",
+          "available_at_block",
+          "blocks_until_available",
+          "reason",
+          "unsigned_call",
+          "cli_command",
+          "notes"
+        ],
+        "title": "RecoveryActionOut",
+        "type": "object"
+      },
+      "RecoveryResponse": {
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "current_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Block"
+          },
+          "recovery_available": {
+            "title": "Recovery Available",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "channel_id",
+          "status",
+          "current_block",
+          "recovery_available",
+          "actions"
+        ],
+        "title": "RecoveryResponse",
+        "type": "object"
+      },
+      "SdkInfo": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "supported_spec_versions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supported Spec Versions"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "SdkInfo",
+        "type": "object"
+      },
+      "SdkVerification": {
+        "description": "The FLOP SDK's own verdict on this turn's receipt at recording time.",
+        "properties": {
+          "error_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Kind"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "SdkVerification",
+        "type": "object"
+      },
+      "SessionDetail": {
+        "description": "Detailed session response.",
+        "properties": {
+          "agent_id": {
+            "title": "Agent Id",
+            "type": "integer"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "decode_policy_hash": {
+            "title": "Decode Policy Hash",
+            "type": "string"
+          },
+          "escrow": {
+            "examples": [
+              "100000000000000000000"
+            ],
+            "pattern": "^-?[0-9]+$",
+            "title": "Escrow",
+            "type": "string"
+          },
+          "fee": {
+            "examples": [
+              "100000000000000000000"
+            ],
+            "pattern": "^-?[0-9]+$",
+            "title": "Fee",
+            "type": "string"
+          },
+          "final_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Root"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "miner_id": {
+            "title": "Miner Id",
+            "type": "integer"
+          },
+          "model_hash": {
+            "title": "Model Hash",
+            "type": "string"
+          },
+          "opened_block": {
+            "title": "Opened Block",
+            "type": "integer"
+          },
+          "precision": {
+            "title": "Precision",
+            "type": "string"
+          },
+          "settled_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled Block"
+          },
+          "sla_deadline_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Deadline Block"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "turn_count": {
+            "title": "Turn Count",
+            "type": "integer"
+          },
+          "window_ends_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Ends Block"
+          }
+        },
+        "required": [
+          "id",
+          "channel_id",
+          "agent_id",
+          "miner_id",
+          "status",
+          "opened_block",
+          "settled_block",
+          "window_ends_block",
+          "sla_deadline_block",
+          "turn_count",
+          "model_hash",
+          "decode_policy_hash",
+          "precision",
+          "escrow",
+          "fee",
+          "final_root"
+        ],
+        "title": "SessionDetail",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "description": "Session response.",
+        "properties": {
+          "agent_id": {
+            "title": "Agent Id",
+            "type": "integer"
+          },
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "miner_id": {
+            "title": "Miner Id",
+            "type": "integer"
+          },
+          "opened_block": {
+            "title": "Opened Block",
+            "type": "integer"
+          },
+          "settled_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled Block"
+          },
+          "sla_deadline_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Deadline Block"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "turn_count": {
+            "title": "Turn Count",
+            "type": "integer"
+          },
+          "window_ends_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Ends Block"
+          }
+        },
+        "required": [
+          "id",
+          "channel_id",
+          "agent_id",
+          "miner_id",
+          "status",
+          "opened_block",
+          "settled_block",
+          "window_ends_block",
+          "sla_deadline_block",
+          "turn_count"
+        ],
+        "title": "SessionResponse",
+        "type": "object"
+      },
+      "TurnRecord": {
+        "description": "One recorded turn.",
+        "properties": {
+          "agent_did": {
+            "title": "Agent Did",
+            "type": "string"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "maxLength": 66,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "client_digest": {
+            "description": "sha256 hex; idempotency key",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Client Digest",
+            "type": "string"
+          },
+          "enc_scheme": {
+            "default": "aes-256-gcm/v1",
+            "enum": [
+              "aes-256-gcm/v1",
+              "none"
+            ],
+            "title": "Enc Scheme",
+            "type": "string"
+          },
+          "model_identity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prompt_token_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Token Ids"
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt"
+          },
+          "recorded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded At"
+          },
+          "request_enc": {
+            "contentMediaType": "application/octet-stream",
+            "format": "base64",
+            "title": "Request Enc",
+            "type": "string"
+          },
+          "request_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Sha256"
+          },
+          "response_enc": {
+            "contentMediaType": "application/octet-stream",
+            "format": "base64",
+            "title": "Response Enc",
+            "type": "string"
+          },
+          "response_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Sha256"
+          },
+          "route": {
+            "default": "direct",
+            "enum": [
+              "direct",
+              "gateway",
+              "other"
+            ],
+            "title": "Route",
+            "type": "string"
+          },
+          "sdk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SdkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sdk_verification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SdkVerification"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settlement_tx": {
+            "anyOf": [
+              {
+                "maxLength": 66,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Tx"
+          },
+          "timings": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timings"
+          },
+          "token_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Ids"
+          },
+          "turn_index": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Index"
+          }
+        },
+        "required": [
+          "agent_did",
+          "client_digest",
+          "request_enc",
+          "response_enc"
+        ],
+        "title": "TurnRecord",
+        "type": "object"
+      },
+      "TurnRecordResponse": {
+        "properties": {
+          "client_digest": {
+            "title": "Client Digest",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "client_digest",
+          "recorded"
+        ],
+        "title": "TurnRecordResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Inference verification and challenge-assistant for FLOP Network",
+    "title": "Touchstone API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/agents": {
+      "get": {
+        "description": "List all watched agents.\n\nReturns:\n    List of agents",
+        "operationId": "list_agents_v1_agents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AgentResponse"
+                  },
+                  "title": "Response List Agents V1 Agents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Agents",
+        "tags": [
+          "agents"
+        ]
+      },
+      "post": {
+        "description": "Register a new agent to watch.\n\nArgs:\n    agent: Agent data\n\nReturns:\n    Created agent",
+        "operationId": "create_agent_v1_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/v1/chain/head": {
+      "get": {
+        "description": "Indexer cursor. 503 until the indexer has processed a block.",
+        "operationId": "chain_head_v1_chain_head_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainHead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Chain Head",
+        "tags": [
+          "chain"
+        ]
+      }
+    },
+    "/v1/chain/network": {
+      "get": {
+        "description": "Network badge data. \"unknown\" until the indexer has written its cursor.",
+        "operationId": "network_v1_chain_network_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Network",
+        "tags": [
+          "chain"
+        ]
+      }
+    },
+    "/v1/disputes": {
+      "post": {
+        "description": "Record a draft dispute (unsigned). Does not sign or submit anything.",
+        "operationId": "create_dispute_v1_disputes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisputeRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Dispute",
+        "tags": [
+          "disputes"
+        ]
+      }
+    },
+    "/v1/disputes/{dispute_id}/approve": {
+      "post": {
+        "description": "Record human approval. Does NOT submit; the human signs and submits externally.",
+        "operationId": "approve_dispute_v1_disputes__dispute_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dispute_id",
+            "required": true,
+            "schema": {
+              "title": "Dispute Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_by",
+            "required": true,
+            "schema": {
+              "title": "Approved By",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Approve Dispute V1 Disputes  Dispute Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Dispute",
+        "tags": [
+          "disputes"
+        ]
+      }
+    },
+    "/v1/healthz": {
+      "get": {
+        "description": "Health check endpoint.",
+        "operationId": "healthz_v1_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Healthz V1 Healthz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Healthz"
+      }
+    },
+    "/v1/metrics": {
+      "get": {
+        "description": "Prometheus metrics in the text exposition format.",
+        "operationId": "metrics_v1_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metrics"
+      }
+    },
+    "/v1/params": {
+      "get": {
+        "description": "All protocol parameters keyed by name.",
+        "operationId": "get_params_v1_params_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/ParamValue"
+                  },
+                  "title": "Response Get Params V1 Params Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Params",
+        "tags": [
+          "parameters"
+        ]
+      }
+    },
+    "/v1/sessions": {
+      "get": {
+        "description": "List sessions with optional filters.",
+        "operationId": "list_sessions_v1_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "agent_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponse"
+                  },
+                  "title": "Response List Sessions V1 Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Sessions",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}": {
+      "get": {
+        "description": "Get session details.",
+        "operationId": "get_session_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/assay": {
+      "post": {
+        "description": "Enqueue an assay. Re-assays are allowed; history is kept.\n\nIf an assay job for this session is already pending or running, return that one.",
+        "operationId": "enqueue_assay_v1_sessions__session_id__assay_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssayEnqueued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enqueue Assay",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/dispute-draft": {
+      "get": {
+        "description": "Preview an unsigned dispute call. Pure read: no rows are written.",
+        "operationId": "get_dispute_draft_v1_sessions__session_id__dispute_draft_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "contested_turn",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Contested Turn"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisputeDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Dispute Draft",
+        "tags": [
+          "disputes"
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/evidence": {
+      "get": {
+        "description": "Download the evidence package as a JSON attachment.",
+        "operationId": "download_evidence_v1_sessions__session_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_plaintext",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Plaintext",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Evidence",
+        "tags": [
+          "evidence"
+        ]
+      }
+    },
+    "/v1/sessions/{session_id}/recovery": {
+      "get": {
+        "description": "Which recovery calls apply, when they become callable, and how to submit them.",
+        "operationId": "get_recovery_v1_sessions__session_id__recovery_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Recovery",
+        "tags": [
+          "recovery"
+        ]
+      }
+    },
+    "/v1/streak/turns": {
+      "post": {
+        "description": "Record a turn. Idempotent on client_digest.",
+        "operationId": "record_turn_v1_streak_turns_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnRecordResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Record Turn",
+        "tags": [
+          "streak"
+        ]
+      }
+    }
+  }
+}

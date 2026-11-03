@@ -238,5 +238,6 @@ def test_settled_direct_result_reports_to_touchstone(tmp_path, monkeypatch):
                               settings=settings, transport=httpx.MockTransport(
                                   lambda req: got.append(json.loads(req.content)) or httpx.Response(201)))
     assert status == "sent" and ledger.get(r.spend_id)["touchstone_reported_at"]
-    assert got[0]["channel_id"] == r.channel_id and got[0]["sdk_verification"] == "sdk_verified"
+    assert got[0]["channel_id"] == r.channel_id and got[0]["sdk_verification"] == {"ok": True}
+    assert all(type(v) is int for v in got[0]["timings"].values())
     assert "Summarise" not in json.dumps(got[0])  # request content only as ciphertext

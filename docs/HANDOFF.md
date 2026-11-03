@@ -59,6 +59,7 @@ blocker (§10). State and next steps: **§10**. Design and sources: [FLOP.md](FL
 | `evidence/` (pre-contest proof for the sonnet contest) | The owner's Mac only | 1 | Not needed on the droplet. Keep it backed up. |
 | FLOP spend key (sr25519, encrypted Polkadot JSON keystore) | Droplet `/var/lib/flopstar/flop/spend.json` (0600 flopstar). Address `5C9zWSykX2EHGF6pbRkPGTHrjYcnj2WjQRnm2xbPfye4uUFb`. | 1 | Generated on the droplet 1 Nov (§10). **No backup.** It holds only devnet FLOP (none yet), so losing it costs nothing today; back up keystore + passphrase before it holds testnet funds. |
 | FLOP spend keystore passphrase | Droplet only, as `/etc/flopstar/creds/flop-spend-passphrase.cred` (32 random bytes, generated straight into `systemd-creds`; nobody has seen it) | 1 | Decryptable only on this droplet (host key). Losing the droplet loses the spend account. |
+| Touchstone streak key (32 bytes, base64) | Droplet only, as `/etc/flopstar/creds/touchstone-streak-key.cred` (generated 3 Nov 2026 15:48 UTC straight into `systemd-creds`; nobody has seen it). Touchstone never holds it. | 1 | Encrypts request/response bytes sent to Touchstone (`aes-256-gcm/v1`). Decryptable only on this droplet; losing it makes the stored ciphertexts unreadable to us (the plaintext sha256 fields remain). Leaking it exposes reported prompts/responses. |
 
 **Rules**
 - **Transfers:** move secrets only over SSH. Never via git, chat, email or logs.
@@ -516,7 +517,7 @@ still don't resolve. `flop status` is healthy (genesis matches pin, kill switch 
 | Timers | **No FLOP timers installed.** The one-off `flopstar-flop-faucet-retry.timer` fired on 2 Nov and was disabled and deleted on 3 Nov. The task runner and recovery units (`deploy/flopstar-flop-run.*`, `flopstar-flop-recovery.*`) are **not installed**. |
 | Kill switch | `/var/lib/flopstar/data/KILL-flop`: absent (clear). |
 | Ledger | `flop_spend`, `flop_spend_events`, `flop_faucet_draws` in `/var/lib/flopstar/data/flopstar.db` (append-only via triggers). Four rows: the four failed faucet draws. Signatures/authorisations log: `data/flop-signatures.log`. |
-| Touchstone | Not configured (no `TOUCHSTONE_*` settings or credentials). Reports would be skipped; nothing is buffered. Wire schema `flopstar.touchstone.v0` is provisional (FLOP.md T1–T4). |
+| Touchstone | Not configured and **not registered**. API is `https://api.touchstone.gold` (healthz ok from here, 3 Nov). Registration body fixed to `{did, account_ss58=spend account, label}`; owner chose to have Flopstar register itself (`flop touchstone register --post`, owner's go-ahead). Turns now use Touchstone's `aes-256-gcm/v1` and SDK `client_digest`. Needs the shared API token (out of band), a streak key we generate, and `check --spec` against Touchstone's `web/openapi.json` (FLOP.md §10, T-answers). |
 | CLI runtime | Docker 29.1.3 (Ubuntu `docker.io`, updated by `unattended-upgrades`); pinned image `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd` pulled and verified (`--version` → `0.1.220`; `session run` accepts every flag we pass). Every CLI container runs with `--memory 640m --memory-swap 1g --pids-limit 256`. |
 | Host changes | Docker installed; `flopstar` in the `docker` group (§9); 2 GiB `/swapfile` (in `/etc/fstab`); kernel now `6.8.0-147-generic`. |
 

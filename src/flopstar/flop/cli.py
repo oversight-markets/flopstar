@@ -2,6 +2,7 @@
 
 import json
 import sys
+from pathlib import Path
 
 from .amounts import format_flop
 from .config import ConfigError, FlopConfig, load_config, ss58_pubkey
@@ -12,7 +13,7 @@ Read-only:
   config [--json]                      Resolved network profile, caps and paths
   status                               Chain health, genesis check, accounts, balances, budget
   wallet address                       Our identity and spend accounts (public)
-  touchstone status | check            Touchstone settings, backlog, schema diff
+  touchstone status | check [--spec F] Touchstone settings, backlog, schema diff
 
 Dry run unless --post:
   wallet setup [--post]                Create the encrypted spend keystore (key design A)
@@ -152,14 +153,21 @@ def run_touchstone(args: list[str], transport=None) -> None:
             return
         r = reporter().post(ts.AGENTS_PATH, payload)
         print(f"HTTP {r.status_code}")
-        if not 200 <= r.status_code < 300:
+        if ts.already_registered(r.status_code, r.text):
+            print("already registered (Touchstone returns 400 for a repeat): ok")
+        elif not 200 <= r.status_code < 300:
+            print(r.text[:500])
             sys.exit(1)
     elif command == "check":
-        rep = reporter()
-        r = rep.get("/openapi.json")
-        if r.status_code != 200:
-            raise SystemExit(f"GET /openapi.json: HTTP {r.status_code}")
-        spec = r.json()
+        spec_file = _option(args, "--spec")
+        if spec_file:  # production Touchstone does not serve /openapi.json; diff a supplied copy
+            spec = json.loads(Path(spec_file).read_text())
+        else:
+            r = reporter().get("/openapi.json")
+            if r.status_code != 200:
+                raise SystemExit(f"GET /openapi.json: HTTP {r.status_code} "
+                                 "(production serves none; use --spec FILE)")
+            spec = r.json()
         problems = (ts.diff_against_openapi(spec, ts.TURNS_PATH, ts.TURN_FIELDS)
                     + ts.diff_against_openapi(spec, ts.AGENTS_PATH, ts.AGENT_FIELDS))
         for p in problems:

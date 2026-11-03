@@ -64,26 +64,69 @@ def spend_row(tmp_path, monkeypatch, verified=True):
 def turn(spend, **kw):
     args = {"cipher": ts.StreakCipher(KEY), "agent_did": DID, "spend": spend, "turn_index": 0,
             "request_bytes": REQ, "response_bytes": RESP, "token_ids": [1, 2, 3],
-            "timings": {"total_ms": 1234}, "receipt": {"verified_turns": 1},
-            "sdk_version": "0.2.0", "cli_version": "0.4.0",
+            "timings": {"started_at": "2026-11-03T12:00:00.000+00:00", "total_ms": 1234}, "receipt": {"verified_turns": 1},
+            "sdk_version": "0.2.0",
             "recorded_at": "2026-11-03T12:00:00.000000+00:00"}
     return ts.build_turn(**{**args, **kw})
 
 
 # ---- payloads -----------------------------------------------------------------------------------
 
-def test_client_digest_is_idempotent_and_ciphertext_is_bound(tmp_path, monkeypatch):
+def test_client_digest_is_touchstones_and_ciphertext_is_v1(tmp_path, monkeypatch):
+    import base64
+    import hashlib
+
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     _, spend = spend_row(tmp_path, monkeypatch)
     a, b = turn(spend), turn(spend)
     assert a["request_enc"] != b["request_enc"]  # fresh nonce each time
-    assert a["client_digest"] == b["client_digest"] == ts.client_digest(a)
-    assert turn(spend, turn_index=1)["client_digest"] != a["client_digest"]
-    cipher = ts.StreakCipher(KEY)
-    aad = cipher.aad(DID, spend["channel_id"], 0, "request")
-    assert cipher.decrypt(a["request_enc"], aad) == REQ
+    # Touchstone SDK: sha256 hex of route|channel_id|turn_index|sha256hex(request)
+    want = hashlib.sha256(("direct|0x" + "ab" * 32 + "|0|" + hashlib.sha256(REQ).hexdigest())
+                          .encode()).hexdigest()
+    assert a["client_digest"] == b["client_digest"] == want
+    assert turn(spend, turn_index=1)["client_digest"] != want
+    assert a["enc_scheme"] == "aes-256-gcm/v1"
+    # decrypt by hand, as Touchstone's helper would: 0x01 || nonce(12) || ct || tag, AAD did\ndigest
+    aad = f"{DID}\n{want}".encode()
+    for field, plain in (("request_enc", REQ), ("response_enc", RESP)):
+        raw = base64.b64decode(a[field])
+        assert raw[0] == 1 and len(raw) == 1 + 12 + len(plain) + 16
+        assert AESGCM(KEY).decrypt(raw[1:13], raw[13:], aad) == plain
     with pytest.raises(Exception):  # noqa: B017 - any AEAD failure
-        cipher.decrypt(a["request_enc"], cipher.aad(DID, spend["channel_id"], 0, "response"))
-    assert REQ.decode() not in json.dumps(a) and a["sdk_verification"] == "sdk_verified"
+        ts.StreakCipher(KEY).decrypt(a["request_enc"], f"{DID}\n{'0' * 64}".encode())
+    assert REQ.decode() not in json.dumps(a) and a["sdk_verification"] == {"ok": True}
+    assert a["timings"] == {"started_at_ms": 1793707200000, "total_ms": 1234}
+    assert a["sdk"] == {"name": "flop-sdk", "version": "0.2.0"}
+
+
+def test_sdk_verdict_and_timings_mapping():
+    assert ts.sdk_verdict("sdk_verified") == {"ok": True}
+    assert ts.sdk_verdict("unverified") is None and ts.sdk_verdict(None) is None
+    assert ts.sdk_verdict("failed")["ok"] is False
+    with pytest.raises(ValueError, match="not an int"):
+        ts.int_timings({"total_ms": 1.5})
+
+
+def test_gateway_turns_get_distinct_digests():
+    from flopstar.flop.inference import _turn_index
+    assert _turn_index({"route": "direct", "id": 7}) == 0
+    assert _turn_index({"route": "gateway", "id": 7}) == 7
+    sha = "00" * 32
+    assert ts.client_digest("gateway", None, 7, sha) != ts.client_digest("gateway", None, 8, sha)
+    assert ts.client_digest("gateway", None, None, sha) == hashlib_hex(f"gateway|||{sha}")
+
+
+def hashlib_hex(text):
+    import hashlib
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def test_streak_key_file_formats():
+    import base64
+    assert ts.parse_streak_key(base64.b64encode(KEY) + b"\n") == KEY
+    assert ts.parse_streak_key(KEY.hex().encode()) == KEY
+    with pytest.raises(ts.TouchstoneConfigError):
+        ts.parse_streak_key(base64.b64encode(KEY[:16]))
 
 
 def test_build_turn_refuses_bytes_that_do_not_match_the_ledger(tmp_path, monkeypatch):
@@ -94,13 +137,15 @@ def test_build_turn_refuses_bytes_that_do_not_match_the_ledger(tmp_path, monkeyp
         turn(spend, response_bytes=b"tampered")
     with pytest.raises(ValueError, match="token_ids"):
         turn(spend, token_ids=[1.0])
+    with pytest.raises(ValueError, match="channel_id"):
+        turn({**spend, "channel_id": None})
 
 
 def test_validate_rejects_undeclared_shapes():
     with pytest.raises(ValueError):
-        ts.validate({"agent_did": DID, "chain_account": MINER}, ts.AGENT_FIELDS)
+        ts.validate({"did": DID, "account_ss58": MINER}, ts.AGENT_FIELDS)
     with pytest.raises(ValueError):
-        ts.validate({"agent_did": DID, "chain_account": 5, "label": "flopstar"}, ts.AGENT_FIELDS)
+        ts.validate({"did": DID, "account_ss58": 5, "label": "flopstar"}, ts.AGENT_FIELDS)
 
 
 # ---- network path -------------------------------------------------------------------------------
@@ -277,4 +322,43 @@ def test_register_post_sends_did_and_account(tmp_path, monkeypatch, capsys):
     run_touchstone(["register", "--chain-account", MINER, "--post"], transport=server.transport())
     body = json.loads(server.requests[0].content)
     assert server.requests[0].url.path == ts.AGENTS_PATH
-    assert body == {"agent_did": DID, "chain_account": MINER, "label": "flopstar"}
+    assert body == {"did": DID, "account_ss58": MINER, "label": "flopstar"}
+
+
+def _register_env(tmp_path, monkeypatch):
+    cfg, _, _, _ = make(tmp_path, monkeypatch)
+    monkeypatch.setenv("FLOPSTAR_FLOP_CONFIG", str(cfg.config_path))
+    for k, v in env(tmp_path).items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.setattr(ts, "check_url", lambda url, resolve=None: [])
+
+
+def test_repeat_registration_is_success_other_400s_are_not(tmp_path, monkeypatch, capsys):
+    _register_env(tmp_path, monkeypatch)
+    dup = httpx.MockTransport(lambda r: httpx.Response(400, json={"detail": "Agent already exists"}))
+    run_touchstone(["register", "--chain-account", MINER, "--post"], transport=dup)
+    assert "already registered" in capsys.readouterr().out
+    bad = httpx.MockTransport(lambda r: httpx.Response(422, json={"detail": "field required"}))
+    with pytest.raises(SystemExit):
+        run_touchstone(["register", "--chain-account", MINER, "--post"], transport=bad)
+
+
+def test_check_reads_a_supplied_spec_without_network(tmp_path, monkeypatch, capsys):
+    _register_env(tmp_path, monkeypatch)
+    props = {k: {"type": v} for k, v in ts.TURN_FIELDS.items()}
+    spec = openapi(props, list(props))
+    spec["paths"][ts.AGENTS_PATH] = {"post": {"requestBody": {"content": {"application/json": {
+        "schema": {"type": "object", "required": ["did", "account_ss58"], "properties": {
+            k: {"type": v} for k, v in ts.AGENT_FIELDS.items()}}}}}}}
+    path = tmp_path / "openapi.json"
+    path.write_text(json.dumps(spec))
+    run_touchstone(["check", "--spec", str(path)], transport=httpx.MockTransport(no_network))
+    assert "0 mismatches" in capsys.readouterr().out
+
+
+def test_payloads_match_touchstones_published_spec():
+    """Touchstone's web/openapi.json at main @ c00367e (production serves none)."""
+    from pathlib import Path
+    spec = json.loads((Path(__file__).parent / "fixtures/touchstone-openapi-c00367e.json").read_text())
+    assert ts.diff_against_openapi(spec, ts.TURNS_PATH, ts.TURN_FIELDS) == []
+    assert ts.diff_against_openapi(spec, ts.AGENTS_PATH, ts.AGENT_FIELDS) == []

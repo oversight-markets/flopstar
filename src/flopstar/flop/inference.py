@@ -368,12 +368,13 @@ def report(cfg: FlopConfig, ledger: Ledger, result: Result, *, agent_did: str,
     except ts.TouchstoneConfigError as e:
         return f"skipped: {e}"
     try:
+        spend = ledger.get(result.spend_id)
         payload = ts.build_turn(
             cipher=ts.StreakCipher(settings.streak_key), agent_did=agent_did,
-            spend=ledger.get(result.spend_id), turn_index=0, request_bytes=result.request_bytes,
+            spend=spend, turn_index=_turn_index(spend), request_bytes=result.request_bytes,
             response_bytes=result.response_bytes, token_ids=None,  # SPEC(S6): CLI omits ids
             timings=result.timings, receipt=result.receipt, sdk_version=sdk_version,
-            cli_version=cli_version, recorded_at=_now())
+            recorded_at=_now())
     except Exception as e:  # noqa: BLE001 - reporting never breaks inference
         return f"skipped: cannot build report: {e}"
     reporter = ts.TouchstoneReporter(settings, cfg.touchstone_buffer, ledger=ledger,
@@ -382,6 +383,12 @@ def report(cfg: FlopConfig, ledger: Ledger, result: Result, *, agent_did: str,
         return reporter.report(result.spend_id, payload)
     finally:
         reporter.close()
+
+
+def _turn_index(spend: dict) -> int:
+    """A direct session is one turn on its own channel (index 0). Gateway turns have no channel, so
+    the ledger id keeps each one's client_digest distinct (Touchstone dedupes on it)."""
+    return 0 if spend["route"] == "direct" else spend["id"]
 
 
 # ---- one interface ------------------------------------------------------------------------------

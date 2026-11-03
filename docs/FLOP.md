@@ -340,6 +340,14 @@ CGNAT address. The bearer token lives in a 0600 file. Request/response bytes are
 per-agent streak key before they leave this server, so even a mis-routed request leaks only
 ciphertext and hashes.
 
+**Settled 3 Nov 2026 (Touchstone main @ c00367e):** there is no private path. Production publishes
+no host ports; the API is reachable only through Caddy at `https://api.touchstone.gold` (TLS), so
+`TOUCHSTONE_API_URL` is that URL and `status` will warn that it is public. `GET /v1/healthz`
+answered `{"status":"ok"}` from this droplet; `/openapi.json` is 404 in production, so `check`
+takes `--spec FILE` (a spec dumped from Touchstone's code). The bearer token is one shared
+`API_TOKEN` for the whole API (it can also register agents and approve disputes), delivered out of
+band by the operator. Touchstone never holds streak keys: we generate and keep ours.
+
 ## 11. Things that worry me
 
 1. `SubstrateClient`'s seed handling (§2.3). Any Python user who passes a mnemonic gets a key
@@ -418,14 +426,41 @@ status | register [--post] [--chain-account SS58] | check | replay [--post]`.
   `https://` works but warns.
 - `report()` never raises. It replays the buffer oldest-first, stops at the first failure, and
   queues the new record behind any backlog. Only a 2xx marks `touchstone_reported_at`.
-- `client_digest` = sha256 of the canonical JSON (sorted keys, compact) of the payload without
-  `request_enc`, `response_enc` and `client_digest`. That makes it identical for every rebuild of
-  the same turn, even though each encryption uses a fresh nonce.
-- We add `schema_version` (`flopstar.touchstone.v0`) to both payloads.
+- `client_digest` is Touchstone's SDK digest (below), identical for every rebuild of a turn even
+  though each encryption uses a fresh nonce.
+- Turns carry exactly Touchstone's `TurnRecord` fields (below); nothing extra.
 
 Touchstone-side `SPEC:` items (to settle with whoever is updating Touchstone):
 
-- **T1. Streak encryption.** Provisional: AES-256-GCM, 12-byte random nonce, base64 of
+Answers from Touchstone's code (3 Nov, main @ c00367e):
+- Registration body is `{did, account_ss58, label}` (fixed in `AGENT_FIELDS`); a repeat returns
+  400 "already exists", which `register` treats as success. Register the **spend** account.
+- Touchstone stores `request_enc`/`response_enc` opaquely and never decrypts. **Adopted** its
+  `aes-256-gcm/v1` (touchstone_streak/crypto.py, streak-bridge/src/streak-key.ts): each field is
+  base64 of `0x01 ‖ nonce(12) ‖ ct ‖ tag(16)`, AAD = UTF-8 `agent_did + "\n" + client_digest`
+  (newline, not `|`), same AAD for request and response (a swap shows in the sha256 fields, which we
+  always send). We send `enc_scheme: "aes-256-gcm/v1"` explicitly. The streak key file is 32 bytes
+  as base64 (hex/raw still accepted); Touchstone never holds it.
+- `client_digest` is Touchstone's SDK digest: sha256 hex of
+  `route|channel_id or ""|turn_index or ""|sha256hex(request)`. Because it dedupes on this, gateway
+  turns (no channel) use the ledger spend id as `turn_index`; direct turns use 0 on their own channel.
+  (We render a `None` index as `""` and 0 as `"0"`.)
+- Extra fields (`schema_version`, `miner`) are accepted and dropped. Null `channel_id` is fine for
+  route `gateway`/`other`; route `direct` requires `channel_id` and `turn_index` (else 422).
+- Dedupes on `client_digest` (64 lowercase hex): a duplicate returns 200 `{"id", "recorded": false}`.
+  An unregistered DID returns 404 "Agent not found"; the buffer resends later.
+- Spec: Touchstone keeps the generated spec at `web/openapi.json` (CI keeps it current). A copy at
+  c00367e is `tests/fixtures/touchstone-openapi-c00367e.json`; `check --spec` and a test diff our
+  payloads against it: **0 mismatches** (3 Nov). To get there, turns now send exactly
+  Touchstone's `TurnRecord` fields: `timings` is `{str: int}` (ISO `started_at` → `started_at_ms`),
+  `sdk_verification` is `{ok, error_kind?}` or null (null for unverified gateway turns), the SDK
+  version goes in `sdk: {name: "flop-sdk", version}`. `model`, `miner`, `network`, `cli_version`
+  and `schema_version` are no longer sent (Touchstone would drop them; our ledger keeps them).
+  Not sent for lack of a value: `model_identity` (needs registry hashes), `settlement_tx`.
+
+Original questions:
+
+- **T1. Streak encryption** (superseded by v1 above). Was provisional: AES-256-GCM, 12-byte random nonce, base64 of
   `nonce‖ciphertext‖tag`, with associated data `flopstar.touchstone.v0|<agent_did>|<channel_id or
   "">|<turn_index>|request|response`. The key file holds 64 hex characters or 32 raw bytes.
 - **T2.** Does Touchstone accept our extra `schema_version` field, and a null `channel_id`/`miner`
@@ -519,7 +554,7 @@ flopstar flop status                         # spend balance arrived
 flopstar flop ask --model <m> --prompt 'Reply OK.' --purpose research-notes --max-flop 0.01
                                              # review plan, then add --post (one request)
 flopstar flop recovery                       # nothing due
-flopstar flop touchstone status && flopstar flop touchstone check
+flopstar flop touchstone status && flopstar flop touchstone check --spec openapi.json
 flopstar flop touchstone register --chain-account <spend SS58>   # then --post
 flopstar flop run                            # review the plan, then enable the timers
 ```
