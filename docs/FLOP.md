@@ -204,7 +204,16 @@ or airdrop weight, and the chain may reset. Read-only checks from the droplet th
 | Session offers | Still **0**. |
 | MCP (`flop-network` 0.2.0) | 34 tools, still read-only for us: no run-session or pay tool. New since §4: `flop_get_inference_receipt` (possible answer to S6), `flop_agent_pack_*`, `flop_knowledge_*`. `flop_generate_secrets` generates HTLC secrets server-side; **never use it** (a secret the server made isn't ours). |
 | Docs status pages | `network-devnet`: "development … administrator-reviewed disposable devnet admission". `network-testnet`: "planned". Testnet hostnames still **don't resolve** on its 3 Nov target date. |
-| Faucet | `/chain` OK. Draws #2 (timer, 2 Nov) and #3 (manual, 3 Nov) both got **503 "IP classification unavailable; retry later"** (failed, no trip). |
+| Faucet | `/chain` OK. Draws #2 (timer, 2 Nov) and #3 (manual, 3 Nov) both got **503 "IP classification unavailable; retry later"** (failed, no trip). The owner got the same 503 from another IP: a faucet-side outage, not our request. |
+
+**Third-party report, 3 Nov (a public devnet user's post; not verified by us):** the faucet is down
+for everyone; a wallet needs **1 FLOP from the faucet to activate a gateway API key** (bears on S4);
+hosted gateway runs log spend under **one shared gateway account** (211 of 310 sessions) rather than
+the caller's address, which matters for which `chain_account` Touchstone can attribute (T3); the
+CLI's quick setup writes an unencrypted recovery phrase (§11.4); "2 miners online" for Qwen 2.5 0.5B.
+What we could check: no new CLI exists (npm 0.4.0 and `releases.json` v0.1.220 are unchanged, so
+"runs without Docker" means the npm package under Node); explorer `/api/sessions` returns 0, so we
+can't reproduce the 310 count.
 
 Effect on the blockers: none removed. The post settles which way S10 goes for builders (devnet is
 meant to be reachable by agents now), but direct still lacks a miner endpoint (S3), the gateway
