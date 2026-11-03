@@ -18,12 +18,13 @@ Environment=FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
 Environment=FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json
 Environment=FLOPSTAR_FLOP_PASSPHRASE_FILE=%d/flop-spend-passphrase
 LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred
-# Touchstone (optional; reports buffer to data/touchstone-buffer.jsonl until configured):
-# Environment=TOUCHSTONE_API_URL=http://touchstone.<tailnet>.ts.net:8080
-# Environment=TOUCHSTONE_API_TOKEN_FILE=%d/touchstone-token
-# Environment=TOUCHSTONE_STREAK_KEY_FILE=%d/touchstone-streak-key
-# LoadCredentialEncrypted=touchstone-token:/etc/flopstar/creds/touchstone-token.cred
-# LoadCredentialEncrypted=touchstone-streak-key:/etc/flopstar/creds/touchstone-streak-key.cred
+# Touchstone: settled turns are reported (encrypted, aes-256-gcm/v1); failures buffer to
+# data/touchstone-buffer.jsonl and replay. Production is reachable only via Caddy over HTTPS.
+Environment=TOUCHSTONE_API_URL=https://api.touchstone.gold
+Environment=TOUCHSTONE_API_TOKEN_FILE=%d/touchstone-token
+Environment=TOUCHSTONE_STREAK_KEY_FILE=%d/touchstone-streak-key
+LoadCredentialEncrypted=touchstone-token:/etc/flopstar/creds/touchstone-token.cred
+LoadCredentialEncrypted=touchstone-streak-key:/etc/flopstar/creds/touchstone-streak-key.cred
 # The pinned CLI runs from the image digest in flop.toml. Membership of the docker group is
 # root-equivalent; see docs/FLOP.md §11 before granting it.
 Environment=FLOPSTAR_FLOP_CLI=docker

@@ -1,0 +1,32 @@
+# One-shot: register Flopstar with Touchstone (`flop touchstone register --post`): its DID and the
+# FLOP spend account (the account that opens channels, so Touchstone's indexer can link them).
+# Gets only the Touchstone API token and streak key as encrypted credentials; reads the spend
+# keystore's public address, never its passphrase. Safe to re-run: a repeat registration returns
+# 400 "already exists", which counts as success.
+[Unit]
+Description=Flopstar: register with Touchstone
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=flopstar
+Group=flopstar
+WorkingDirectory=/opt/flopstar
+Environment=HOME=/var/lib/flopstar
+Environment=FLOPSTAR_DATA_DIR=/var/lib/flopstar/data
+Environment=FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
+Environment=FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json
+Environment=TOUCHSTONE_API_URL=https://api.touchstone.gold
+Environment=TOUCHSTONE_API_TOKEN_FILE=%d/touchstone-token
+Environment=TOUCHSTONE_STREAK_KEY_FILE=%d/touchstone-streak-key
+LoadCredentialEncrypted=touchstone-token:/etc/flopstar/creds/touchstone-token.cred
+LoadCredentialEncrypted=touchstone-streak-key:/etc/flopstar/creds/touchstone-streak-key.cred
+ExecStart=/opt/flopstar/.venv/bin/flopstar flop touchstone register --post
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flopstar/data
+InaccessiblePaths=/etc/flopstar/keys
