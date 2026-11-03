@@ -219,20 +219,9 @@ The full per-sweep record is in the **flow file** referenced by the hash, which 
 flowchart LR
     subgraph droplet["Flopstar droplet (systemd, user flopstar)"]
         direction TB
-        creds[("systemd encrypted credentials<br/>owner passphrase · tree seed<br/>spend passphrase · Touchstone token · streak key")]
+        creds[("systemd encrypted credentials<br/>spend passphrase · Touchstone token · streak key<br/>(+ owner passphrase, tree seed)")]
 
-        subgraph contest["Close Call contest (concluded, services stopped)"]
-            direction TB
-            monitor["monitor.py<br/>read-only, verifies referee sigs"]
-            store[("SQLite store<br/>append-only")]
-            trader["trader.py<br/>shadow fold + 64-key tree"]
-            treesigner["TreeSigner<br/>64 HKDF tree keys"]
-            policysigner["PolicySigner<br/>owner key: room, heartbeat"]
-            fold["vendor/close-call<br/>fold (unmodified)"]
-            monitor --> store --> trader
-            trader --> fold
-            trader --> treesigner
-        end
+        contest["Close Call contest (close-1)<br/>concluded 4 Oct 2026, all services stopped<br/>monitor · tree trader · room signer<br/>see docs/TREE.md, HANDOFF §1"]
 
         subgraph flop["FLOP agent (parked for testnet)"]
             direction TB
@@ -247,17 +236,11 @@ flowchart LR
             policy --> cli
             inference --> reporter
         end
-        creds -.-> treesigner
-        creds -.-> policysigner
         creds -.-> policy
         creds -.-> reporter
     end
 
-    subgraph technocore["technocore.chat"]
-        referee["referee rooms<br/>d-close1-*"]
-        rooms["close1 · d-flopstar-close1"]
-    end
-    hl["Hyperliquid<br/>xyz:NVDA"]
+    technocore["technocore.chat<br/>(contest rooms)"]
 
     subgraph flopnet["FLOP Network (devnet)"]
         chain["chain RPC<br/>escrow channels"]
@@ -270,10 +253,7 @@ flowchart LR
         indexer["indexer<br/>channels by spend account"]
     end
 
-    referee -- long-poll + export --> monitor
-    hl -- last trade --> trader
-    treesigner -- signed trades --> rooms
-    policysigner -- registration · heartbeat --> rooms
+    contest -. inactive .- technocore
     cli -- open channel, verify receipt --> miner
     cli --> chain
     policy -- draw --> faucet
@@ -281,9 +261,11 @@ flowchart LR
     chain -.-> indexer
 ```
 
-The owner key (`flopstar.pem`) never trades and never touches FLOP. Tree keys trade only through
-`TreeSigner`; the spend account signs only through `FlopPolicy`; Touchstone sees only ciphertext
-and hashes.
+The owner key (`flopstar.pem`) never touches FLOP: the spend account signs only through
+`FlopPolicy`, and Touchstone sees only ciphertext and hashes. The concluded contest is one box
+here; its monitor, 64-key tree trader and signers are described in [Running the
+Monitor](#running-the-monitor), [Running the Trader](#running-the-trader) and
+[docs/TREE.md](docs/TREE.md).
 
 ```
 src/flopstar/
