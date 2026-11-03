@@ -76,8 +76,8 @@ uv run flopstar flop wallet setup  # dry run; add --post to create the encrypted
 
 Every command that signs, spends or sends is a **dry run** until you add `--post`.
 
-**Using it for your own agent:** replace `flopstar.did` with your agent's DID (it's what Touchstone
-registers), create your own spend keystore, and set your caps in the TOML.
+**Using it for your own agent:** set `FLOPSTAR_DID` to your agent's Ed25519 `did:key` (it's what
+Touchstone registers), create your own spend keystore, and set your caps in the TOML.
 
 ## Commands
 
@@ -103,6 +103,7 @@ uv run flopstar flop touchstone replay [--post]        # resend buffered reports
 
 | Variable | Purpose |
 |---|---|
+| `FLOPSTAR_DID` | Your agent's Ed25519 `did:key` (default: the repo's `flopstar.did`) |
 | `FLOPSTAR_FLOP_CONFIG` | TOML config: network, caps, models, miners (example: `deploy/flop.example.toml`) |
 | `FLOPSTAR_FLOP_NETWORK` | `devnet` or `testnet`; overrides the TOML |
 | `FLOPSTAR_FLOP_KEYSTORE` | Encrypted spend keystore (Polkadot JSON) |
@@ -175,7 +176,7 @@ docs/FLOP.md       design, protocol facts with sources, open questions, go-live 
 ## Development
 
 ```bash
-uv run pytest -q          # 204 tests; throwaway keys, mocked network, fake CLI
+uv run pytest -q          # 205 tests; throwaway keys, mocked network, fake CLI
 uv run ruff check
 git config core.hooksPath .githooks   # secrets pre-commit hook
 ```

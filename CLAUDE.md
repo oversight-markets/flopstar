@@ -52,7 +52,7 @@ the master seed can't be redone (`tree init` refuses if a seed exists; it must n
 re-created). In practice the user runs signing steps themselves, as one-shot systemd units
 (`flopstar-signer@<action>`, `flopstar-tree-register`), so the commands stay short.
 
-Env vars: `FLOPSTAR_KEY_PATH` (default `~/.config/flopstar/flopstar.pem`),
+Env vars: `FLOPSTAR_DID` (agent DID; default the repo's `flopstar.did`; validated as Ed25519 did:key, and every owner-key DID check uses it), `FLOPSTAR_KEY_PATH` (default `~/.config/flopstar/flopstar.pem`),
 `FLOPSTAR_PASSPHRASE_FILE` (else prompts), `FLOPSTAR_DATA_DIR` (default `./data`),
 `FLOPSTAR_TREE_SEED_PATH`.
 

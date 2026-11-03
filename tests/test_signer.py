@@ -1,5 +1,6 @@
 """did:key derivation and encrypted key loading, with a throwaway in-test key."""
 
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
@@ -29,8 +30,21 @@ def test_encrypted_key_loads_with_passphrase_file(tmp_path, monkeypatch):
     assert did_from_private_key(loaded) == did_from_private_key(key)
 
 
-def test_expected_did_is_flopstar():
+def test_expected_did_is_flopstar(monkeypatch):
+    monkeypatch.delenv("FLOPSTAR_DID", raising=False)
     assert expected_did() == "did:key:z6MkjLpUAGLtNieLnCFQoUScwJxAKwo5PHZcHRsdyiCJG5Bv"
+    monkeypatch.setenv("FLOPSTAR_DID", "  ")  # blank falls back to the file
+    assert expected_did() == "did:key:z6MkjLpUAGLtNieLnCFQoUScwJxAKwo5PHZcHRsdyiCJG5Bv"
+
+
+def test_flopstar_did_env_overrides_and_is_validated(monkeypatch):
+    other = did_from_private_key(Ed25519PrivateKey.generate())
+    monkeypatch.setenv("FLOPSTAR_DID", other + "\n")
+    assert expected_did() == other
+    for bad in ("did:web:example.com", "did:key:zNotBase58!!", "not-a-did"):
+        monkeypatch.setenv("FLOPSTAR_DID", bad)
+        with pytest.raises(ValueError, match="Ed25519 did:key"):
+            expected_did()
 
 
 def test_signed_owner_message_verifies():

@@ -41,8 +41,17 @@ def did_from_private_key(key: Ed25519PrivateKey) -> str:
 
 
 def expected_did() -> str:
-    """Flopstar's DID as recorded in the repo's flopstar.did."""
-    return (Path(__file__).parents[2] / "flopstar.did").read_text().strip()
+    """The agent's DID: FLOPSTAR_DID if set (to run this code as your own agent), else the repo's
+    flopstar.did. Must be an Ed25519 did:key; anything else is refused."""
+    from .didkey import did_to_public_key
+    did = os.environ.get("FLOPSTAR_DID", "").strip()
+    if not did:
+        did = (Path(__file__).parents[2] / "flopstar.did").read_text().strip()
+    try:
+        did_to_public_key(did)
+    except Exception as e:  # noqa: BLE001 - any parse failure means a bad DID
+        raise ValueError(f"not an Ed25519 did:key: {did!r} ({e})") from None
+    return did
 
 
 def sign_message(key: Ed25519PrivateKey, room: str, nonce: int, text: str) -> str:
