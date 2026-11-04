@@ -246,15 +246,14 @@ def _sized_plan(cfg, policy, *, route: str, model: str, prompt: str, purpose: st
     except estimate.EstimateUnavailable as e:
         why = str(e)
     max_flop = explicit if explicit is not None else (est.escrow_raw if est else None)
+    # Plan (and the caller's execute, via view["miner"]) use the miner that was priced, rather
+    # than choosing again.
     view = inference.plan(cfg, policy, route=route, model=model, prompt=prompt, purpose=purpose,
-                          max_flop=max_flop or cfg.caps.max_flop_per_request,
-                          max_tokens=max_tokens, miner=miner, which=_which())
+                          max_flop=max_flop, max_tokens=max_tokens,
+                          miner=priced_miner or miner, which=_which())
     view["estimate"] = est.describe() if est else f"unavailable: {why}"
     view["max_flop_source"] = "--max-flop" if explicit is not None else "estimate"
     if max_flop is None:
-        view["max_flop"] = None
-        view.pop("argv", None)
-        view["problems"] = [p for p in view["problems"] if "max_flop" not in p]
         view["problems"].append(f"no escrow estimate ({why}); pass --max-flop to set it")
     elif est and explicit is not None and explicit < est.escrow_raw:
         view["warning"] = (f"--max-flop {format_flop(explicit)} is below the estimate "
@@ -266,9 +265,12 @@ def _sized_plan(cfg, policy, *, route: str, model: str, prompt: str, purpose: st
 def _flop_amount(text: str) -> int:
     from .amounts import AmountError, parse_flop
     try:
-        return parse_flop(text)
+        raw = parse_flop(text)
     except AmountError as e:
         raise SystemExit(f"bad amount: {e}") from None
+    if raw <= 0:
+        raise SystemExit(f"bad amount: {text!r} must be positive")
+    return raw
 
 
 # ---- status and wallet --------------------------------------------------------------------------
@@ -431,7 +433,7 @@ def run_ask(args: list[str]) -> None:
     a = ap.parse_args(args)
     cfg = _load()
     policy = _policy(cfg)
-    explicit = _flop_amount(a.max_flop) if a.max_flop else None
+    explicit = _flop_amount(a.max_flop) if a.max_flop is not None else None
     try:
         assert_no_secrets(a.prompt)
     except SecretInInput as e:
@@ -447,6 +449,7 @@ def run_ask(args: list[str]) -> None:
     if view["problems"]:
         raise SystemExit("refused: " + "; ".join(view["problems"]))
     kw["max_flop"] = max_flop
+    kw["miner"] = view.get("miner") or a.miner  # the miner that was priced and planned
     result = inference.execute(cfg, policy, which=_which(), runner=HOOKS["runner"],
                                transport=HOOKS["transport"], passphrase=HOOKS["passphrase"], **kw)
     _report_and_print(cfg, policy, result, view.get("cli"))

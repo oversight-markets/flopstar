@@ -25,7 +25,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from .amounts import check_raw, raw_from_str
+from .amounts import AmountError, check_raw, raw_from_str
 
 ROUTES = ("direct", "gateway", "native")
 STATUSES = ("prepared", "sent", "settled", "refunded", "failed", "recovering")
@@ -192,7 +192,10 @@ class Ledger:
         if unknown:
             raise LedgerError(f"cannot set {sorted(unknown)}")
         if "settled_flop" in fill and fill["settled_flop"] is not None:
-            fill["settled_flop"] = str(check_raw(fill["settled_flop"]))
+            try:
+                fill["settled_flop"] = str(check_raw(fill["settled_flop"]))
+            except AmountError as e:
+                raise LedgerError(f"spend {spend_id}: bad outflow: {e}") from None
         if fill.get("verification") not in (None, *VERIFICATIONS):
             raise LedgerError(f"bad verification {fill['verification']!r}")
         with self.transaction() as c:

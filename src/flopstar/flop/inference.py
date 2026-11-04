@@ -395,11 +395,16 @@ def _turn_index(spend: dict) -> int:
 # ---- one interface ------------------------------------------------------------------------------
 
 def plan(cfg: FlopConfig, policy: FlopPolicy, *, route: str, model: str, prompt: str,
-         purpose: str, max_flop: int, max_tokens: int = DEFAULT_MAX_TOKENS,
+         purpose: str, max_flop: int | None, max_tokens: int = DEFAULT_MAX_TOKENS,
          miner: str | None = None, which=shutil.which) -> dict:
-    """What `ask --post` would do. Reads only local state: no network, no key, no ledger write."""
+    """
+    What `ask --post` would do. Reads only local state: no network, no key, no ledger write.
+    max_flop None (no escrow could be sized) skips the amount checks and the argv, and adds a
+    problem, so the plan can never be sent; every other check still runs.
+    """
     from .wallet import spend_address
-    out = {"route": route, "model": model, "purpose": purpose, "max_flop": format_flop(max_flop),
+    out = {"route": route, "model": model, "purpose": purpose,
+           "max_flop": None if max_flop is None else format_flop(max_flop),
            "max_tokens": max_tokens, "prompt_chars": len(prompt),
            "budget": policy.budget().describe(), "problems": []}
     if route not in ROUTES:
@@ -415,7 +420,7 @@ def plan(cfg: FlopConfig, policy: FlopPolicy, *, route: str, model: str, prompt:
         try:
             prefix, keystore_arg, version = cli_prefix(cfg, which)
             out["cli"] = version
-            if chosen:
+            if chosen and max_flop is not None:
                 from .policy import redact_argv
                 out["argv"] = redact_argv(direct_argv(
                     cfg, prefix, keystore_arg, miner=chosen, endpoint=endpoint, model=model,
@@ -431,7 +436,11 @@ def plan(cfg: FlopConfig, policy: FlopPolicy, *, route: str, model: str, prompt:
             out["problems"].append(str(e))
     else:
         out["problems"].append("native route not available (SPEC S1)")
-    out["problems"] += policy.check_inference(route, model, chosen, max_flop)
+    if max_flop is None:
+        out["problems"] += policy.check_request(route, model, chosen)
+        out["problems"].append("no escrow amount (max_flop)")
+    else:
+        out["problems"] += policy.check_inference(route, model, chosen, max_flop)
     if not cfg.network.genesis_hash:
         out["problems"].append(f"{cfg.network.name} genesis not pinned")
     return out

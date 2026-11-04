@@ -148,3 +148,49 @@ def test_explicit_max_flop_still_bounded_by_ceiling(isolated, monkeypatch, capsy
     cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
                   "--miner", SERVING, "--max-tokens", "64", "--max-flop", "0.7", "--post"])
     assert seen[0][seen[0].index("--max-flop") + 1] == "0.7"
+
+
+def test_plan_and_execute_use_the_miner_that_was_priced(isolated, monkeypatch, capsys):
+    # Even if choose_miner gave a different answer on a second unrequested call, the plan (and
+    # so execute, via view["miner"]) must use the miner the estimate priced.
+    from flopstar.flop import inference
+    from tests.flop_helpers import MINER
+    create_spend_keystore(isolated, "correct horse battery staple")
+    roomy_caps(isolated)
+    real, unrequested = inference.choose_miner, iter([SERVING, MINER, MINER])
+
+    def flaky(cfg, ledger, requested=None):
+        return real(cfg, ledger, requested or next(unrequested))
+    monkeypatch.setattr(inference, "choose_miner", flaky)
+    # The catalog prices only SERVING, so pricing one miner and planning another would show up.
+    monkeypatch.setitem(cli.HOOKS, "transport",
+                        catalog_transport(catalog_body(miners=[SERVING]), also=explode))
+    cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                  "--max-tokens", "64"])
+    out = capsys.readouterr().out
+    assert f"miner: {SERVING}" in out and MINER not in out
+    assert "problems: []" in out
+
+
+def test_no_estimate_still_reports_the_spent_day_budget(isolated, monkeypatch):
+    from flopstar.flop.ledger import Ledger
+    create_spend_keystore(isolated, "correct horse battery staple")
+    ledger = Ledger(isolated.db_path)
+    for i in range(5):  # 5 x 0.01 = the test config's 0.05 day cap
+        ledger.prepare(network="devnet", route="direct", model=MODEL, miner=SERVING,
+                       max_flop=10**16, purpose="t", request_sha256=f"{i:064x}")
+    ledger.close()
+    monkeypatch.setitem(cli.HOOKS, "transport", catalog_transport(b"not json", also=explode))
+    with pytest.raises(SystemExit) as e:
+        cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                      "--miner", SERVING, "--max-tokens", "64", "--post"])
+    assert "no escrow estimate" in str(e.value) and "max_flop_per_day" in str(e.value)
+
+
+@pytest.mark.parametrize("amount", ["0", "0.0", "-1"])
+def test_explicit_max_flop_must_be_positive(isolated, amount):
+    create_spend_keystore(isolated, "correct horse battery staple")
+    with pytest.raises(SystemExit, match="bad amount"):
+        cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                      "--miner", SERVING, "--max-flop", amount, "--post"])
+    assert not isolated.kill_path.exists()

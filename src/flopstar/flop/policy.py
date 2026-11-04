@@ -144,6 +144,25 @@ class FlopPolicy:
 
     def check_inference(self, route: str, model: str, miner: str | None, max_flop: int) -> list[str]:
         """Every reason this request would be refused (empty list: allowed). Never trips."""
+        caps, problems = self.cfg.caps, self.check_request(route, model, miner)
+        if not isinstance(max_flop, int) or isinstance(max_flop, bool) or max_flop <= 0:
+            problems.append("max_flop must be positive int base units")
+            return problems
+        if max_flop > caps.max_flop_per_request:
+            problems.append(f"max_flop {format_flop(max_flop)} exceeds max_flop_per_request "
+                            f"{format_flop(caps.max_flop_per_request)}")
+        b = self.budget()
+        if max_flop > b.remaining_today:
+            problems.append(f"max_flop {format_flop(max_flop)} exceeds today's remaining "
+                            f"{format_flop(b.remaining_today)}")
+        return problems
+
+    def check_request(self, route: str, model: str, miner: str | None) -> list[str]:
+        """
+        The checks that do not depend on the amount (a plan with no escrow yet still shows them,
+        including a spent day budget). Never authorizes anything: authorize_inference always runs
+        the full check_inference. Never trips.
+        """
         caps, problems = self.cfg.caps, []
         if self.kill_reason() is not None:
             problems.append("kill switch is tripped")
@@ -155,16 +174,9 @@ class FlopPolicy:
             problems.append("a direct session must name its miner")
         if miner is not None and caps.is_blocked_miner(miner):
             problems.append(f"miner {miner} is on the same_control_miners blocklist")
-        if not isinstance(max_flop, int) or isinstance(max_flop, bool) or max_flop <= 0:
-            problems.append("max_flop must be positive int base units")
-            return problems
-        if max_flop > caps.max_flop_per_request:
-            problems.append(f"max_flop {format_flop(max_flop)} exceeds max_flop_per_request "
-                            f"{format_flop(caps.max_flop_per_request)}")
         b = self.budget()
-        if max_flop > b.remaining_today:
-            problems.append(f"max_flop {format_flop(max_flop)} exceeds today's remaining "
-                            f"{format_flop(b.remaining_today)}")
+        if b.remaining_today <= 0:
+            problems.append(f"max_flop_per_day ({format_flop(caps.max_flop_per_day)}) spent")
         if b.requests_left_this_hour <= 0:
             problems.append(f"max_requests_per_hour ({caps.max_requests_per_hour}) reached")
         return problems

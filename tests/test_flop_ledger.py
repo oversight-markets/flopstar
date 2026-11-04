@@ -106,6 +106,7 @@ def test_settled_outflow_cannot_exceed_the_escrow(tmp_path):
     ledger.transition(sid, "sent")
     with pytest.raises(LedgerError, match="exceeds its escrow"):
         ledger.transition(sid, "settled", settled_flop=101)
-    with pytest.raises(AmountError, match="negative amount"):
-        ledger.transition(sid, "settled", settled_flop=-1)
+    for bad in (-1, "7", 1.5, True):
+        with pytest.raises(LedgerError, match="bad outflow"):
+            ledger.transition(sid, "settled", settled_flop=bad)
     assert ledger.get(sid)["status"] == "sent"
