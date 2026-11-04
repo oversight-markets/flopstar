@@ -42,8 +42,8 @@ def write(tmp_path, text):
 def test_example_config_loads_with_starting_caps():
     cfg = load_config(EXAMPLE, env={})
     assert cfg.network.name == "devnet"
-    assert cfg.caps.max_flop_per_request == 10**16
-    assert cfg.caps.max_flop_per_day == 5 * 10**17
+    assert cfg.caps.max_flop_per_request == 10**18  # devnet ceilings approved 4 Nov 2026
+    assert cfg.caps.max_flop_per_day == 5 * 10**18
     assert cfg.network.genesis_hash == DEVNET_GENESIS
     assert cfg.kill_path.name == "KILL-flop"
 

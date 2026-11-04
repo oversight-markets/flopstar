@@ -21,6 +21,8 @@ Dry run unless --post:
   faucet [--amount FLOP] [--post]      Draw from the network faucet into the spend account
   ask --model M --prompt TEXT --purpose NAME [--route direct|gateway] [--miner SS58]
       [--max-flop FLOP] [--max-tokens N] [--post]
+                                       Escrow (= the cost) defaults to the estimate from the
+                                       public catalog price; max_flop_per_request is the ceiling
   run [--route direct|gateway] [--post]          Run the useful-work tasks (contest-digest,
                                                  ops-review, research-notes) within budget
   recovery [--post]                    Find our channels with escrow to recover; submit the calls
@@ -220,6 +222,46 @@ def _policy(cfg):
     return FlopPolicy(cfg, Ledger(cfg.db_path))
 
 
+def _sized_plan(cfg, policy, *, route: str, model: str, prompt: str, purpose: str,
+                max_tokens: int, miner: str | None, explicit: int | None) -> dict:
+    """
+    inference.plan with the escrow sized by `estimate` (GET of the public catalog, no key).
+
+    The escrow is the cost (a cooperative settle pays all of it), so it defaults to the estimate;
+    max_flop_per_request is only the ceiling `check_inference` holds it under. No estimate and no
+    explicit --max-flop means no escrow at all: the plan carries a problem and nothing is sent.
+    """
+    from . import estimate, inference
+    priced_miner = None
+    if route == "direct":
+        try:
+            priced_miner, _ = inference.choose_miner(cfg, policy.ledger, miner)
+        except inference.RouteUnavailable:
+            pass  # plan() reports it
+    est, why = None, None
+    try:
+        est = estimate.estimate(cfg, model=model, prompt=prompt, max_tokens=max_tokens,
+                                miner=priced_miner, transport=HOOKS["transport"])
+    except estimate.EstimateUnavailable as e:
+        why = str(e)
+    max_flop = explicit if explicit is not None else (est.escrow_raw if est else None)
+    view = inference.plan(cfg, policy, route=route, model=model, prompt=prompt, purpose=purpose,
+                          max_flop=max_flop or cfg.caps.max_flop_per_request,
+                          max_tokens=max_tokens, miner=miner, which=_which())
+    view["estimate"] = est.describe() if est else f"unavailable: {why}"
+    view["max_flop_source"] = "--max-flop" if explicit is not None else "estimate"
+    if max_flop is None:
+        view["max_flop"] = None
+        view.pop("argv", None)
+        view["problems"] = [p for p in view["problems"] if "max_flop" not in p]
+        view["problems"].append(f"no escrow estimate ({why}); pass --max-flop to set it")
+    elif est and explicit is not None and explicit < est.escrow_raw:
+        view["warning"] = (f"--max-flop {format_flop(explicit)} is below the estimate "
+                           f"{format_flop(est.escrow_raw)}; the miner may refuse the turn")
+    view["_max_flop_raw"] = max_flop
+    return view
+
+
 def _flop_amount(text: str) -> int:
     from .amounts import AmountError, parse_flop
     try:
@@ -388,20 +430,22 @@ def run_ask(args: list[str]) -> None:
     a = ap.parse_args(args)
     cfg = _load()
     policy = _policy(cfg)
-    max_flop = _flop_amount(a.max_flop) if a.max_flop else cfg.caps.max_flop_per_request
+    explicit = _flop_amount(a.max_flop) if a.max_flop else None
     try:
         assert_no_secrets(a.prompt)
     except SecretInInput as e:
         raise SystemExit(f"refused: {e}") from None
     kw = {"route": a.route, "model": a.model, "prompt": a.prompt, "purpose": a.purpose,
-          "max_flop": max_flop, "max_tokens": a.max_tokens, "miner": a.miner}
-    view = inference.plan(cfg, policy, which=_which(), **kw)
+          "max_tokens": a.max_tokens, "miner": a.miner}
+    view = _sized_plan(cfg, policy, explicit=explicit, **kw)
+    max_flop = view.pop("_max_flop_raw")
     _print(view)
     if not a.post:
         print("dry run: nothing sent (add --post)")
         return
     if view["problems"]:
         raise SystemExit("refused: " + "; ".join(view["problems"]))
+    kw["max_flop"] = max_flop
     result = inference.execute(cfg, policy, which=_which(), runner=HOOKS["runner"],
                                transport=HOOKS["transport"], passphrase=HOOKS["passphrase"], **kw)
     _report_and_print(cfg, policy, result, view.get("cli"))
@@ -423,7 +467,6 @@ def run_tasks(args: list[str]) -> None:
         raise SystemExit("allowed_models is empty; nothing may be bought")
     model = cfg.caps.allowed_models[0]
     jobs, outcomes = tasks.collect(cfg, policy.ledger, datetime.now(UTC))
-    max_flop = cfg.caps.max_flop_per_request
     passphrase = HOOKS["passphrase"]
     for job in jobs:
         try:
@@ -431,8 +474,10 @@ def run_tasks(args: list[str]) -> None:
         except tasks.SecretInInput as e:
             outcomes.append({"task": job.task, "outcome": "refused", "reason": str(e)})
             continue
-        view = inference.plan(cfg, policy, route=route, model=model, prompt=job.prompt,
-                              purpose=job.task, max_flop=max_flop, which=_which())
+        view = _sized_plan(cfg, policy, route=route, model=model, prompt=job.prompt,
+                           purpose=job.task, max_tokens=inference.DEFAULT_MAX_TOKENS,
+                           miner=None, explicit=None)
+        max_flop = view.pop("_max_flop_raw")
         if view["problems"]:
             outcomes.append({"task": job.task, "outcome": "stopped",
                              "reason": "; ".join(view["problems"])})

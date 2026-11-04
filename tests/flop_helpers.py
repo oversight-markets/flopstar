@@ -84,3 +84,31 @@ def make_full(tmp_path, monkeypatch, clock=None):
     clock = clock or Clock()
     ledger = Ledger(cfg.db_path, now=clock)
     return cfg, ledger, FlopPolicy(cfg, ledger, now=clock), clock
+
+
+def catalog_body(price: str = "0.006", miners=None, expires_at: str = "2999-01-01T00:00:00Z",
+                 model: str = MODEL) -> bytes:
+    """A `GET /models` body shaped like api.flop.network/v1/models (4 Nov 2026)."""
+    import json
+    miners = [SERVING, MINER] if miners is None else miners
+    sources = [{"miner_address": m, "version": "chain:1", "source": "devnet-nominal",
+                "effective_at": "2026-11-04T13:50:06.000Z", "expires_at": expires_at}
+               for m in miners]
+    row = {"id": model, "object": "model", "pricing": {"prompt": price, "completion": price,
+                                                       "input_cache_read": "0"},
+           "x-flop": {"price_sources": sources}}
+    return json.dumps({"object": "list", "data": [row], "total_count": 1}).encode()
+
+
+def catalog_transport(body: bytes | None = None, also=None):
+    """httpx MockTransport serving only GET <gateway>/models; anything else goes to `also`."""
+    import httpx
+    body = catalog_body() if body is None else body
+
+    def handler(request):
+        if request.method == "GET" and request.url.path.endswith("/models"):
+            return httpx.Response(200, content=body)
+        if also is not None:
+            return also(request)
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+    return httpx.MockTransport(handler)

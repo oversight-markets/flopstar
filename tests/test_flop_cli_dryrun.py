@@ -1,15 +1,22 @@
 """Every command that signs, spends or sends does nothing without --post."""
 
-import httpx
 import pytest
 
 from flopstar.flop import cli
 from flopstar.flop.wallet import create_spend_keystore
-from tests.flop_helpers import BLOCKED, MODEL, make_full
+from tests.flop_helpers import BLOCKED, MODEL, SERVING, catalog_body, catalog_transport, make_full
 
 
 def explode(*a, **k):
     raise AssertionError("dry run touched the network, the chain or the signing CLI")
+
+
+def roomy_caps(cfg, per_request="1", per_day="5"):
+    """Rewrite the test config with devnet-sized ceilings (the estimate floor is 0.05 FLOP)."""
+    text = cfg.config_path.read_text()
+    text = text.replace('max_flop_per_request = "0.01"', f'max_flop_per_request = "{per_request}"')
+    text = text.replace('max_flop_per_day = "0.05"', f'max_flop_per_day = "{per_day}"')
+    cfg.config_path.write_text(text)
 
 
 @pytest.fixture
@@ -19,7 +26,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setitem(cli.HOOKS, "chain", explode)
     monkeypatch.setitem(cli.HOOKS, "http", explode)
     monkeypatch.setitem(cli.HOOKS, "runner", explode)
-    monkeypatch.setitem(cli.HOOKS, "transport", httpx.MockTransport(explode))
+    # The only network a dry run may touch: GET of the public model catalog (no key).
+    monkeypatch.setitem(cli.HOOKS, "transport", catalog_transport(also=explode))
     monkeypatch.setitem(cli.HOOKS, "which", lambda n: "/usr/bin/docker" if n == "docker" else None)
     monkeypatch.setitem(cli.HOOKS, "passphrase", "correct horse battery staple")
     return cfg
@@ -79,8 +87,66 @@ def test_ask_post_runs_through_the_fake_cli(isolated, monkeypatch, capsys):
     stdout = (FIXTURES / "session-run-success.SYNTHETIC.json").read_text()
     monkeypatch.setitem(cli.HOOKS, "runner",
                         lambda argv, env, **kw: subprocess.CompletedProcess(argv, 0, stdout, ""))
+    roomy_caps(isolated)
+    seen = []
+    monkeypatch.setitem(cli.HOOKS, "runner", lambda argv, env, **kw: (
+        seen.append(argv), subprocess.CompletedProcess(argv, 0, stdout, ""))[1])
     cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "research-notes",
-                  "--miner", "5ED68Tgj9G6xtPnWKxzBkr7cij6nPR3kVXUYQ2RT27igsrH2", "--post"])
+                  "--miner", SERVING, "--max-tokens", "64", "--post"])
     out = capsys.readouterr().out
     assert "status: settled" in out and "untrusted model output" in out
     assert "touchstone: skipped" in out  # not configured in tests
+    # (2 prompt bytes + 40 template + 64 output) x 0.006 = 0.636 FLOP: the estimate, not the cap
+    argv = seen[0]
+    assert argv[argv.index("--max-flop") + 1] == "0.636"
+
+
+def test_ask_defaults_to_the_estimate_not_the_ceiling(isolated, capsys):
+    create_spend_keystore(isolated, "correct horse battery staple")
+    roomy_caps(isolated)
+    cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                  "--miner", SERVING, "--max-tokens", "64"])
+    out = capsys.readouterr().out
+    assert "max_flop: 0.636" in out and "max_flop_source: estimate" in out
+    assert "problems: []" in out
+
+
+def test_ask_refuses_when_estimate_exceeds_the_ceiling(isolated):
+    create_spend_keystore(isolated, "correct horse battery staple")
+    roomy_caps(isolated)
+    # 512 default output tokens x 0.006 = over 3 FLOP: refused, never clipped to the ceiling.
+    with pytest.raises(SystemExit, match="exceeds max_flop_per_request"):
+        cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                      "--miner", SERVING, "--post"])
+
+
+@pytest.mark.parametrize("body", [b"not json", catalog_body(price="-1"), catalog_body(price="0"),
+                                  catalog_body(miners=[]),
+                                  catalog_body(expires_at="2000-01-01T00:00:00Z"),
+                                  catalog_body(model="other/model")])
+def test_ask_without_estimate_refuses_instead_of_escrowing_the_ceiling(isolated, monkeypatch,
+                                                                       body):
+    create_spend_keystore(isolated, "correct horse battery staple")
+    roomy_caps(isolated)
+    monkeypatch.setitem(cli.HOOKS, "transport", catalog_transport(body, also=explode))
+    with pytest.raises(SystemExit, match="no escrow estimate"):
+        cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                      "--miner", SERVING, "--max-tokens", "64", "--post"])
+
+
+def test_explicit_max_flop_still_bounded_by_ceiling(isolated, monkeypatch, capsys):
+    import subprocess
+
+    from tests.flop_helpers import FIXTURES
+    create_spend_keystore(isolated, "correct horse battery staple")
+    roomy_caps(isolated)
+    with pytest.raises(SystemExit, match="exceeds max_flop_per_request"):
+        cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                      "--miner", SERVING, "--max-tokens", "64", "--max-flop", "2", "--post"])
+    stdout = (FIXTURES / "session-run-success.SYNTHETIC.json").read_text()
+    seen = []
+    monkeypatch.setitem(cli.HOOKS, "runner", lambda argv, env, **kw: (
+        seen.append(argv), subprocess.CompletedProcess(argv, 0, stdout, ""))[1])
+    cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                  "--miner", SERVING, "--max-tokens", "64", "--max-flop", "0.7", "--post"])
+    assert seen[0][seen[0].index("--max-flop") + 1] == "0.7"

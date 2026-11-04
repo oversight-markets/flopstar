@@ -10,8 +10,9 @@ network = "devnet"
 # genesis_hash, cli_npm_version, cli_image.
 
 [devnet.caps]
-max_flop_per_request = "0.01"
-max_flop_per_day = "0.5"
+# Ceilings. The escrow each request locks (and pays) is its estimate; see flop/estimate.py.
+max_flop_per_request = "1"
+max_flop_per_day = "5"
 max_requests_per_hour = 6
 max_faucet_draws_per_day = 1
 allowed_models = ["qwen/qwen2.5-0.5b-instruct"]
