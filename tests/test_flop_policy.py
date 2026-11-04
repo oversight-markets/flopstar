@@ -91,6 +91,23 @@ def test_daily_cap_holds_across_restarts(tmp_path, monkeypatch):
         ask(policy2, 6)
 
 
+def test_daily_cap_counts_in_flight_escrow_at_open(tmp_path, monkeypatch):
+    # Committed escrow counts in full from authorize (before the channel opens) until it is
+    # settled or refunded, so concurrent asks cannot overshoot max_flop_per_day together.
+    _, ledger, policy, clock = make(tmp_path, monkeypatch)
+    sids = []
+    for i in range(5):  # 5 x 0.01 = the 0.05 day cap, none settled
+        sids.append(ask(policy, i))
+        clock.advance(minutes=16)  # stay under max_requests_per_hour
+    ledger.transition(sids[0], "sent")
+    clock.advance(minutes=61)
+    assert policy.budget().spent_today == 5 * CENT
+    assert any("remaining" in p for p in policy.check_inference("direct", MODEL, MINER, 1))
+    ledger.transition(sids[0], "settled", settled_flop=4 * 10**15)
+    assert policy.budget().spent_today == 4 * CENT + 4 * 10**15  # settled: only what was paid
+    assert policy.check_inference("direct", MODEL, MINER, 6 * 10**15) == []
+
+
 def test_hourly_request_cap_and_window(tmp_path, monkeypatch):
     _, ledger, policy, clock = make(tmp_path, monkeypatch)
     for i in range(4):

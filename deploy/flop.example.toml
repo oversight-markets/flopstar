@@ -10,7 +10,10 @@ network = "devnet"
 # genesis_hash, cli_npm_version, cli_image.
 
 [devnet.caps]
-# Ceilings. The escrow each request locks (and pays) is its estimate; see flop/estimate.py.
+# Ceilings. Each request escrows its estimate (flop/estimate.py), and the escrow is the bill:
+# the devnet cooperative settle at block 2796872 refunded nothing (miner_paid + the 1%
+# AuditFeeEarmarked = escrow). The audit fee comes out of the escrow, not on top of it.
+# The day cap counts escrow in full from authorize until settled or refunded.
 max_flop_per_request = "1"
 max_flop_per_day = "5"
 max_requests_per_hour = 6

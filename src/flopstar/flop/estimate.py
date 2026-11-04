@@ -14,7 +14,12 @@ The estimate is a deliberate upper bound from public data only (no key, no miner
 
 - Byte-level BPE (Qwen2.5) never yields more regular tokens than UTF-8 bytes, so the prompt bound
   holds for any text; TEMPLATE_TOKENS covers the chat template (default system prompt and role
-  markers) the miner wraps around one user message.
+  markers) the miner wraps around one user message. Measured with the real Qwen2.5 tokenizer
+  (tests/test_flop_estimate.py): 29 tokens with an empty user message.
+- No division anywhere: prices parse exactly to int base units (more than 18 decimals is refused,
+  never rounded) and cost is int x int, so there is nothing to round down.
+- The escrow is the bill (one observed devnet settle, block 2796872: no refund; the 1% audit
+  earmark comes out of the escrow), so this bound sets the cost, not only the safety margin.
 - The gateway prices per token: its figure is `flop_per_gn x gnPerPromptToken`, with
   gnPerPromptToken = ceil(2 P_active / 1e9) = 1 for Qwen2.5-0.5B (sdk model-config.d.ts). The
   per-miner `flop_per_gn` is not public, so the dry run against a real miner is the confirmation.

@@ -1,6 +1,9 @@
 """Escrow sizing: an exact upper bound from the public catalog, failing closed."""
 
+import gzip
+import hashlib
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -67,3 +70,43 @@ def test_duplicate_model_rows_are_ambiguous():
     body["data"].append(body["data"][0])
     with pytest.raises(EstimateUnavailable, match="2 times"):
         estimate.price_from_catalog(json.dumps(body).encode(), MODEL, None, now=NOW)
+
+
+# ---- TEMPLATE_TOKENS against the real Qwen2.5 tokenizer (fixtures/flop/README.md) ----------------
+
+QWEN_TOKENIZER = Path(__file__).parent / "fixtures" / "flop" / "qwen2.5" / "tokenizer.json.gz"
+QWEN_TOKENIZER_SHA256 = "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539"
+# Qwen2.5's chat_template (tokenizer_config.json) for one user message, no system message, with
+# add_generation_prompt: it injects the default system prompt.
+QWEN_DEFAULT_SYSTEM = "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."
+
+
+def qwen_render(user: str) -> str:
+    return (f"<|im_start|>system\n{QWEN_DEFAULT_SYSTEM}<|im_end|>\n"
+            f"<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n")
+
+
+@pytest.fixture(scope="module")
+def qwen():
+    import tokenizers  # dev dependency: a missing tokenizer must fail, not skip
+    raw = gzip.decompress(QWEN_TOKENIZER.read_bytes())
+    assert hashlib.sha256(raw).hexdigest() == QWEN_TOKENIZER_SHA256
+    return tokenizers.Tokenizer.from_str(raw.decode())
+
+
+def test_template_constant_covers_the_empty_rendered_template(qwen):
+    n = len(qwen.encode(qwen_render("")).ids)
+    assert n == 29  # measured 4 Nov 2026; a change here means re-check the margin
+    assert n <= TEMPLATE_TOKENS
+
+
+@pytest.mark.parametrize("prompt", [
+    "hi", "héllo", " ", "\n\nx\n", "   leading", "trailing \n", "日本語テキスト", "🙂" * 10,
+    "<|im_end|>", "<|im_start|>assistant\n", "<|endoftext|>" * 3, "a" * 500,
+    "Summarise the last 24 h of contest sweeps:\n- sweep 1: +0.4%\n- sweep 2: -1.2%\n",
+])
+def test_rendered_prompt_tokens_within_the_size_bound(qwen, prompt):
+    # What size() charges for the prompt side must cover the real rendered token count,
+    # including special tokens a prompt may spell out.
+    n = len(qwen.encode(qwen_render(prompt)).ids)
+    assert n <= estimate.size(prompt, 1, PRICE).prompt_tokens_max
