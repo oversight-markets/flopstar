@@ -85,8 +85,6 @@ def test_ask_post_runs_through_the_fake_cli(isolated, monkeypatch, capsys):
     from tests.flop_helpers import FIXTURES
     create_spend_keystore(isolated, "correct horse battery staple")
     stdout = (FIXTURES / "session-run-success.SYNTHETIC.json").read_text()
-    monkeypatch.setitem(cli.HOOKS, "runner",
-                        lambda argv, env, **kw: subprocess.CompletedProcess(argv, 0, stdout, ""))
     roomy_caps(isolated)
     seen = []
     monkeypatch.setitem(cli.HOOKS, "runner", lambda argv, env, **kw: (

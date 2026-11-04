@@ -87,12 +87,12 @@ def make_full(tmp_path, monkeypatch, clock=None):
 
 
 def catalog_body(price: str = "0.006", miners=None, expires_at: str = "2999-01-01T00:00:00Z",
-                 model: str = MODEL) -> bytes:
+                 model: str = MODEL, effective_at: str = "2026-11-04T13:50:06.000Z") -> bytes:
     """A `GET /models` body shaped like api.flop.network/v1/models (4 Nov 2026)."""
     import json
     miners = [SERVING, MINER] if miners is None else miners
     sources = [{"miner_address": m, "version": "chain:1", "source": "devnet-nominal",
-                "effective_at": "2026-11-04T13:50:06.000Z", "expires_at": expires_at}
+                "effective_at": effective_at, "expires_at": expires_at}
                for m in miners]
     row = {"id": model, "object": "model", "pricing": {"prompt": price, "completion": price,
                                                        "input_cache_read": "0"},

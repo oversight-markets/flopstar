@@ -267,7 +267,8 @@ def run_direct(cfg: FlopConfig, policy: FlopPolicy, *, model: str, prompt: str, 
         channel_id=result.channel_id, settlement_tx=data["settle_tx"],
         response_sha256=hashlib.sha256(response).hexdigest(),
         receipt_json=json.dumps(data, sort_keys=True), verification="sdk_verified",
-        # SPEC(S6): the CLI does not report the settled amount; the ledger keeps max_flop.
+        # SPEC(S6): the CLI reports no amount, so no outflow (escrow - refund) is recorded and the
+        # day cap keeps counting the full max_flop.
     )
     policy.log_cli_result(spend_id, {"exit": 0, "channel": result.channel_id,
                                      "settle_tx": data["settle_tx"],

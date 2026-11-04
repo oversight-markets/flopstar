@@ -10,7 +10,7 @@ The estimate is a deliberate upper bound from public data only (no key, no miner
 
     tokens  = UTF-8 bytes of the prompt + TEMPLATE_TOKENS + max_tokens
     cost    = tokens x max(pricing.prompt, pricing.completion)   # gateway price, FLOP per token
-    escrow  = max(cost, MIN_ESCROW_RAW)
+    escrow  = max(cost, min_escrow)          # [<network>].min_escrow in flop.toml
 
 - Byte-level BPE (Qwen2.5) never yields more regular tokens than UTF-8 bytes, so the prompt bound
   holds for any text; TEMPLATE_TOKENS covers the chat template (default system prompt and role
@@ -24,7 +24,8 @@ The estimate is a deliberate upper bound from public data only (no key, no miner
   gnPerPromptToken = ceil(2 P_active / 1e9) = 1 for Qwen2.5-0.5B (sdk model-config.d.ts). The
   per-miner `flop_per_gn` is not public, so the dry run against a real miner is the confirmation.
 - The chain's own tariff (`basePerTurn` = 1 raw unit per turn + sum of G_n raw units) is negligible
-  next to the price; MIN_ESCROW_RAW is the force-open floor read from the devnet runtime.
+  next to the price; min_escrow is the force-open floor, set per network in flop.toml (the
+  devnet default was read from the runtime). A network without one gets no estimate.
 
 Every source fails closed: no catalog, no such model, a malformed price, or (direct route) a miner
 the catalog does not currently price means no estimate, and the request is refused unless the
@@ -40,8 +41,6 @@ from .amounts import AmountError, format_flop, parse_flop
 from .config import ConfigError, FlopConfig, ss58_pubkey
 
 TEMPLATE_TOKENS = 40
-# computeChannel.minForceOpenEscrowForFailedAck on devnet (spec_version 1014003), read 4 Nov 2026.
-MIN_ESCROW_RAW = 50_000_000_000_000_000  # 0.05 FLOP
 CATALOG_TIMEOUT_S = 20
 
 
@@ -55,15 +54,17 @@ class Estimate:
     output_tokens_max: int
     raw_per_token: int
     cost_raw: int
+    floor_raw: int
     escrow_raw: int
 
     def describe(self) -> dict:
         return {"prompt_tokens_max": self.prompt_tokens_max,
                 "output_tokens_max": self.output_tokens_max,
-                "price_per_token": format_flop(self.raw_per_token),
+                # The gateway's model-wide price; not a quote from the chosen miner.
+                "catalog_price_per_token": format_flop(self.raw_per_token),
                 "cost": format_flop(self.cost_raw),
                 "escrow": format_flop(self.escrow_raw),
-                "floor": format_flop(MIN_ESCROW_RAW)}
+                "floor": format_flop(self.floor_raw)}
 
 
 def _price(value, what: str) -> int:
@@ -123,8 +124,9 @@ def price_from_catalog(body: bytes, model: str, miner: str | None,
                     continue
             except ConfigError:
                 continue
+            effective = _parse_time(s.get("effective_at"))
             expires = _parse_time(s.get("expires_at"))
-            if expires is not None and now < expires:
+            if effective is not None and expires is not None and effective <= now < expires:
                 live = True
         if not live:
             raise EstimateUnavailable(f"catalog has no live price for miner {miner}")
@@ -147,17 +149,22 @@ def fetch_price(cfg: FlopConfig, model: str, miner: str | None,
     return price_from_catalog(r.content, model, miner)
 
 
-def size(prompt: str, max_tokens: int, raw_per_token: int) -> Estimate:
+def size(prompt: str, max_tokens: int, raw_per_token: int, floor_raw: int) -> Estimate:
     """The escrow upper bound for one turn at `raw_per_token`. Pure, exact integers."""
     if type(max_tokens) is not int or max_tokens <= 0:
         raise ValueError("max_tokens must be a positive int")
+    if type(floor_raw) is not int or floor_raw <= 0:
+        raise ValueError("floor_raw must be a positive int")
     prompt_tokens = len(prompt.encode("utf-8")) + TEMPLATE_TOKENS
     cost = (prompt_tokens + max_tokens) * raw_per_token
     return Estimate(prompt_tokens_max=prompt_tokens, output_tokens_max=max_tokens,
-                    raw_per_token=raw_per_token, cost_raw=cost,
-                    escrow_raw=max(cost, MIN_ESCROW_RAW))
+                    raw_per_token=raw_per_token, cost_raw=cost, floor_raw=floor_raw,
+                    escrow_raw=max(cost, floor_raw))
 
 
 def estimate(cfg: FlopConfig, *, model: str, prompt: str, max_tokens: int, miner: str | None,
              transport: httpx.BaseTransport | None = None) -> Estimate:
-    return size(prompt, max_tokens, fetch_price(cfg, model, miner, transport))
+    if cfg.network.min_escrow is None:
+        raise EstimateUnavailable(f"[{cfg.network.name}].min_escrow is not set in flop.toml")
+    return size(prompt, max_tokens, fetch_price(cfg, model, miner, transport),
+                cfg.network.min_escrow)

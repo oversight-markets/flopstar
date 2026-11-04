@@ -103,8 +103,12 @@ def test_daily_cap_counts_in_flight_escrow_at_open(tmp_path, monkeypatch):
     clock.advance(minutes=61)
     assert policy.budget().spent_today == 5 * CENT
     assert any("remaining" in p for p in policy.check_inference("direct", MODEL, MINER, 1))
-    ledger.transition(sids[0], "settled", settled_flop=4 * 10**15)
-    assert policy.budget().spent_today == 4 * CENT + 4 * 10**15  # settled: only what was paid
+    ledger.transition(sids[0], "settled")  # no outflow recorded (the CLI reports none)
+    assert policy.budget().spent_today == 5 * CENT
+    ledger.transition(sids[1], "sent")
+    # Outflow = escrow 0.01 - refund 0.006 (chain events / balance change), not a claimed amount.
+    ledger.transition(sids[1], "settled", settled_flop=CENT - 6 * 10**15)
+    assert policy.budget().spent_today == 4 * CENT + 4 * 10**15
     assert policy.check_inference("direct", MODEL, MINER, 6 * 10**15) == []
 
 

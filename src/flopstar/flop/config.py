@@ -47,6 +47,9 @@ class NetworkProfile:
     genesis_hash: str | None  # None: not pinned, so nothing may run against this network
     cli_npm_version: str | None
     cli_image: str | None  # image@sha256 digest from flop.network/releases.json
+    # Escrow floor in base units (computeChannel.minForceOpenEscrowForFailedAck); config key
+    # `min_escrow` as a decimal FLOP string. None: unknown, so no escrow estimate (fail closed).
+    min_escrow: int | None = None
 
 
 # sdk:chain.js FLOP_NETWORK_PROFILES; devnet genesis and HTTPS RPC observed 2026-11-01 (FLOP.md §4);
@@ -66,6 +69,8 @@ BUILTIN_PROFILES = {
             "ghcr.io/flop-labs/flop-core/cli:v0.1.220"
             "@sha256:c8f3456c48d41cec9d0229d1e1dd9eb8d6247a22f350c51078d85f129601bbbd"
         ),
+        # Read from the devnet runtime (spec_version 1014003) on 2026-11-04.
+        min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
     ),
     # Status "planned", genesis policy "pin-before-live"; none of these hosts resolve yet.
     "testnet": NetworkProfile(
@@ -82,6 +87,7 @@ BUILTIN_PROFILES = {
         genesis_hash=None,
         cli_npm_version="0.4.0",
         cli_image=None,  # SPEC(S5): which CLI build FLOP supports on testnet
+        min_escrow=None,  # read it from the testnet runtime once live
     ),
 }
 
@@ -182,7 +188,11 @@ def _profile(name: str, overrides: dict) -> NetworkProfile:
     if unknown:
         raise ConfigError(f"[{name}] has unknown keys: {sorted(unknown)}")
     values = {k: v for k, v in overrides.items() if k not in ("caps", "miners")}
+    if "min_escrow" in values:
+        values["min_escrow"] = _flop(f"[{name}]", "min_escrow", values["min_escrow"])
     for key, value in values.items():
+        if key == "min_escrow":
+            continue
         if not isinstance(value, str):
             raise ConfigError(f"[{name}].{key} must be a string")
         if key in _URL_KEYS and urlparse(value).scheme not in ("https", "wss"):

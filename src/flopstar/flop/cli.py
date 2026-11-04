@@ -44,6 +44,7 @@ def describe(cfg: FlopConfig) -> dict:
         "mcp_url": n.mcp_url,
         "cli_npm_version": n.cli_npm_version,
         "cli_image": n.cli_image,
+        "min_escrow": format_flop(n.min_escrow) if n.min_escrow is not None else None,
         "caps": {
             "max_flop_per_request": format_flop(c.max_flop_per_request),
             "max_flop_per_day": format_flop(c.max_flop_per_day),

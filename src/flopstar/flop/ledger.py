@@ -7,7 +7,14 @@ flop_spend_events  every status change, with detail. Never updated or deleted.
 flop_faucet_draws  every faucet draw attempt; status moves once from `requested`.
 
 SQLite triggers enforce all of this, so a bug elsewhere cannot rewrite history. Amounts are base-unit
-digit strings. Cap checks and inserts share one BEGIN IMMEDIATE transaction (see `transaction`), so
+digit strings.
+
+`settled_flop` is the agent's real outflow for the request, escrow - refund, taken from the chain's
+settle/refund events or the spend account's balance change. It is never miner_paid or the claimed
+amount: the 1% audit earmark also comes out of the escrow, and the devnet settle at block 2796872
+refunded nothing, so a claim below the escrow can still mean the whole escrow was spent. Nothing
+writes it yet (the CLI does not report an amount, SPEC S6), so a settled request counts its full
+escrow. Cap checks and inserts share one BEGIN IMMEDIATE transaction (see `transaction`), so
 concurrent runs cannot both pass a cap.
 """
 
@@ -190,6 +197,10 @@ class Ledger:
             raise LedgerError(f"bad verification {fill['verification']!r}")
         with self.transaction() as c:
             row = self.get(spend_id)
+            if fill.get("settled_flop") is not None and (
+                    int(fill["settled_flop"]) > raw_from_str(row["max_flop"])):
+                raise LedgerError(f"spend {spend_id}: outflow {fill['settled_flop']} exceeds "
+                                  f"its escrow {row['max_flop']}")
             if status not in TRANSITIONS.get(row["status"], set()):
                 raise LedgerError(f"spend {spend_id}: {row['status']} -> {status} not allowed")
             c.execute(
@@ -258,8 +269,9 @@ class Ledger:
 
     def spent_since(self, network: str, since: datetime) -> int:
         """
-        Base units committed since `since`. Conservative: escrow counts in full until refunded or
-        settled (then the settled amount); a request that failed before it was sent counts 0.
+        Base units committed since `since`. Conservative: escrow counts in full from authorize
+        until it is settled with a recorded outflow (`settled_flop` = escrow - refund, never the
+        claimed amount) or refunded; a request that failed before it was sent counts 0.
         Transaction fees are not included (they are not in max_flop).
         """
         rows = self.conn.execute(

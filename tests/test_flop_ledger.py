@@ -97,3 +97,15 @@ def test_monitor_messages_table_untouched(tmp_path):
     MessageStore(db).store_message("r", 1, {"seq": 1})
     Ledger(db)
     assert MessageStore(db).get_message("r", 1) == {"seq": 1}
+
+
+def test_settled_outflow_cannot_exceed_the_escrow(tmp_path):
+    ledger = Ledger(tmp_path / "flopstar.db")
+    sid = ledger.prepare(network="devnet", route="direct", model="m", miner=None, max_flop=100,
+                         purpose="t", request_sha256="0" * 64)
+    ledger.transition(sid, "sent")
+    with pytest.raises(LedgerError, match="exceeds its escrow"):
+        ledger.transition(sid, "settled", settled_flop=101)
+    with pytest.raises(AmountError, match="negative amount"):
+        ledger.transition(sid, "settled", settled_flop=-1)
+    assert ledger.get(sid)["status"] == "sent"

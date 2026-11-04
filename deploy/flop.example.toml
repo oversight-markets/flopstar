@@ -8,6 +8,9 @@ network = "devnet"
 # Endpoints, genesis and CLI pin default to the built-in profile (src/flopstar/flop/config.py);
 # override any of: rpc_url, rpc_http_url, faucet_url, gateway_url, indexer_url, mcp_url,
 # genesis_hash, cli_npm_version, cli_image.
+# Escrow floor (computeChannel.minForceOpenEscrowForFailedAck), read from the devnet runtime
+# (spec_version 1014003) on 4 Nov 2026. Every request escrows at least this much.
+min_escrow = "0.05"
 
 [devnet.caps]
 # Ceilings. Each request escrows its estimate (flop/estimate.py), and the escrow is the bill:
@@ -25,6 +28,7 @@ same_control_miners = []   # SS58 addresses of miners Oversight controls; never 
 # Testnet refuses to run until its genesis is pinned (FLOP: "pin-before-live", docs/FLOP.md S2).
 # genesis_hash = "0x..."
 # rpc_http_url = "https://..."
+# min_escrow = "..."   # read from the testnet runtime; without it no request can be sized
 
 [testnet.caps]
 max_flop_per_request = "0.01"
