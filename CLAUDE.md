@@ -103,7 +103,9 @@ Env vars: `FLOPSTAR_DID` (agent DID; default the repo's `flopstar.did`; validate
 - **FLOP agent** (`src/flopstar/flop/`, design and sources in `docs/FLOP.md`): buys inference on
   the FLOP Network, separate from the contest modules. Config is `FLOPSTAR_FLOP_CONFIG` (TOML,
   example `deploy/flop.example.toml`) + `FLOPSTAR_FLOP_NETWORK`; every cap is explicit and amounts
-  are int base units / decimal strings (`flop/amounts.py`), never floats. Never pass a secret to
+  are int base units / decimal strings (`flop/amounts.py`), never floats. A settle pays the whole
+  escrow, so `ask`/`run` escrow an estimate from the public catalog (`flop/estimate.py`, floor
+  `[<net>].min_escrow`), not the cap; sizing fails closed (FLOP.md §12). Never pass a secret to
   `flop_sdk.SubstrateOptions.seed` (it derives from the public dev phrase; FLOP.md §2.3).
   Key design A: the owner key does nothing on FLOP; a capped spend account pays. Only
   `flop/policy.py` (FlopPolicy) may sign; the spend ledger is append-only by SQLite triggers;

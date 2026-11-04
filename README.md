@@ -48,8 +48,11 @@ flowchart LR
     chain -.-> indexer
 ```
 
-1. A task (or `flop ask`) asks for inference. Every spend goes through **FlopPolicy**, which
-   checks the caps and records the spend in the ledger before anything is signed.
+1. A task (or `flop ask`) asks for inference. Its escrow is **sized from FLOP's public model
+   catalog** before anything is signed (`flop/estimate.py`), because a settled channel pays the
+   miner the whole escrow: the escrow is the bill, and the per-request cap is only a ceiling.
+   Every spend goes through **FlopPolicy**, which checks the caps and records the spend in the
+   ledger before anything is signed.
 2. The **direct** route runs FLOP's pinned `flop session run` CLI: it opens an escrow channel with
    a miner, and the FLOP SDK verifies the receipt before paying (`sdk_verified`). The **gateway**
    route uses FLOP's OpenAI-style API (`unverified`).
@@ -92,7 +95,8 @@ uv run flopstar flop touchstone check [--spec FILE]    # diff payloads against T
 # dry run unless --post
 uv run flopstar flop wallet setup [--post]
 uv run flopstar flop faucet [--post]
-uv run flopstar flop ask --model M --prompt TEXT --purpose NAME [--route direct|gateway] [--post]
+uv run flopstar flop ask --model M --prompt TEXT --purpose NAME [--route direct|gateway]
+    [--miner SS58] [--max-tokens N] [--max-flop FLOP] [--post]   # escrow defaults to the estimate
 uv run flopstar flop run [--post]                      # scheduled useful-work tasks, within budget
 uv run flopstar flop recovery [--post]                 # recover escrow from our stuck channels
 uv run flopstar flop touchstone register [--post]      # register your DID + spend account
@@ -116,6 +120,15 @@ uv run flopstar flop touchstone replay [--post]        # resend buffered reports
 | `TOUCHSTONE_STREAK_KEY_FILE` | Your streak key: 32 random bytes, base64. Touchstone never holds it |
 
 Amounts are decimal FLOP strings (`"0.01"`) or integer base units (18 decimals), never floats.
+
+**Escrow sizing.** Each request escrows an upper bound on its cost, from public data only:
+`(prompt UTF-8 bytes + 40 template tokens + max_tokens) × max(prompt, completion price)` from the
+gateway's `GET /models`, and never less than the network's `min_escrow` (`[devnet]` in the TOML,
+0.05 FLOP). The 40-token template allowance is tested against the real Qwen2.5 tokenizer, which
+renders the default chat template to 29 tokens. If the catalog is unreachable, malformed, has no
+current price for the chosen miner, or the network has no `min_escrow`, nothing is sent unless
+you pass `--max-flop`. Either way the escrow must stay under `max_flop_per_request`, and the day
+cap counts it in full from the moment it is authorised.
 
 ## Touchstone
 
@@ -143,6 +156,8 @@ Touchstone records each inference turn an agent buys and links it to the on-chai
 - **One gate.** Only `FlopPolicy` may sign or launch the signing CLI. It enforces per-request,
   per-hour and per-day caps, a model allowlist and a miner blocklist, and checks the chain's
   genesis against the pinned one.
+- **Escrow sized, not guessed.** Escrow is the estimate, not the cap, and sizing fails closed.
+  The day cap counts committed escrow (not what was later claimed) until the chain shows a refund.
 - **Kill switch.** `data/KILL-flop` stops every FLOP action. It trips on cap breaches,
   verification failures and unexpected errors, and only a human removes it.
 - **Append-only ledger.** SQLite triggers stop spend and faucet history being rewritten; every
@@ -163,6 +178,7 @@ src/flopstar/flop/
 ├── client.py      chain reads (flop-sdk), runtime checks
 ├── wallet.py      spend keystore
 ├── faucet.py      faucet draws
+├── estimate.py    escrow sizing from the public model catalog
 ├── inference.py   direct (CLI) and gateway routes
 ├── tasks.py       scheduled useful-work tasks
 ├── recovery.py    permissionless channel recovery
@@ -176,7 +192,7 @@ docs/FLOP.md       design, protocol facts with sources, open questions, go-live 
 ## Development
 
 ```bash
-uv run pytest -q          # 205 tests; throwaway keys, mocked network, fake CLI
+uv run pytest -q          # 258 tests; throwaway keys, mocked network, fake CLI
 uv run ruff check
 git config core.hooksPath .githooks   # secrets pre-commit hook
 ```

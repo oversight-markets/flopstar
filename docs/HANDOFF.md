@@ -5,7 +5,7 @@
 **Written**: 25 September 2026, 15:40 UTC; **updated 25 September 2026, 23:05 UTC** after the move; **28 September 2026, 19:50 UTC** after
 the round-1 split; **4 October 2026, 14:45 UTC** after the lock, the statement and the wind-down;
 **1 November 2026, 18:10 UTC** for the FLOP agent (§10); **3 November 2026** after FLOP opened
-devnet to builders (§10)
+devnet to builders (§10); **4 November 2026** for escrow sizing and the new devnet caps (§10)
 **Host**: droplet `flopstar` (68.183.21.81), running only Flopstar
 **Previous host**: `hoodwatch` (167.99.238.68): decommissioned for Flopstar on 25 Sep; its repo
 clone was deleted and its copies of the key and seed shredded (owner-confirmed)
@@ -20,8 +20,9 @@ the only place where a mistake can't be undone.
 **Since 1 Nov 2026 the droplet also hosts the FLOP agent** (`src/flopstar/flop/`): Flopstar buying
 inference on the FLOP Network, with every purchase recorded and reported to Touchstone. It is built,
 deployed and holds a spend account, but it is **parked until FLOP's testnet** (target 3 Nov 2026,
-not up on the day) and spends nothing. FLOP opened devnet to builders on 3 Nov; that changes no
-blocker (§10). State and next steps: **§10**. Design and sources: [FLOP.md](FLOP.md).
+not up on the day) and spends nothing. FLOP opened devnet to builders on 3 Nov, and since 4 Nov the
+agent is ready to buy on devnet (escrow sizing, 1 / 5 FLOP caps): the only blocker there is a miner
+session endpoint (S3). State and next steps: **§10**. Design and sources: [FLOP.md](FLOP.md).
 
 ---
 
@@ -512,7 +513,8 @@ still don't resolve. `flop status` is healthy (genesis matches pin, kill switch 
 |---|---|
 | Code | Phases 0–7 complete in `src/flopstar/flop/`, pushed to `main` and deployed to `/opt/flopstar` (venv synced; `flop-sdk==0.2.0`). |
 | Key design | **A**: the owner key (`flopstar.pem`) does nothing on FLOP. A separate sr25519 **spend account** pays escrow; its balance plus FlopPolicy's caps bound spending. Only `flop/policy.py` signs or launches the signing CLI. |
-| Network | **devnet** (earns nothing). `/etc/flopstar/flop.toml` (0640 root:flopstar) is the example config: genesis pinned `0x99c1…d631`, caps 0.01 FLOP/request, 0.5/day, 6 requests/h, 1 faucet draw/day, model `qwen/qwen2.5-0.5b-instruct`, **no miners listed**, empty blocklist. |
+| Network | **devnet** (earns nothing). `/etc/flopstar/flop.toml` (0640 root:flopstar): genesis pinned `0x99c1…d631`, `min_escrow = "0.05"`, caps **1 FLOP/request, 5/day** (raised from 0.01 / 0.5 on 4 Nov after review; backup `/etc/flopstar/flop.toml.bak-20261104`), 6 requests/h, 1 faucet draw/day, model `qwen/qwen2.5-0.5b-instruct`, **no miners listed**, empty blocklist. |
+| Escrow sizing | Since 4 Nov (`2da4302`, deployed to `/opt/flopstar`): each ask escrows an estimate from the gateway's public catalog, not the cap, because a settle pays the whole escrow (FLOP.md §12). A dry run as `flopstar` (32 tokens, 24-byte prompt) sized 0.576 FLOP and was refused only for the empty `[devnet.miners]`. |
 | Spend account | `5C9zWSykX2EHGF6pbRkPGTHrjYcnj2WjQRnm2xbPfye4uUFb`, **25 FLOP** (faucet grant, landed 2026-11-03 ~12:40 UTC; read over RPC: free `25000000000000000000`, nonce 0, providers 1). Keystore and passphrase credential in §2. Verified: decrypts via the credential as `flopstar`. |
 | Faucet | Draw #1 (2026-11-01 18:03 UTC): 429 "IP daily grant budget reached", although this IP had never drawn. Draw #2 (the retry timer, 2026-11-02 18:10 UTC) and draw #3 (manual, owner's go-ahead, 2026-11-03): 503 "IP classification unavailable; retry later", no `Retry-After`. The owner got the same 503 from another machine the same day, and a public devnet user reported the faucet down for everyone, so it was a **FLOP-side outage**, not our IP or request. Before draw #4 the faucet's `/health` was `ok` (connected, ~9.97M FLOP free, image `0.1.245`; limits 300 grants/IP/day, 1/address/24 h) and `/chain` matched our genesis pin. Draw #4 (manual, owner's go-ahead, 2026-11-03 12:38 UTC): 503 **"Grant pending; retry the original request later"**, no `Retry-After`. The grant was in flight, not refused: **25 FLOP** (the faucet's default grant) landed between 12:40:18 and 12:40:50 UTC. The ledger records all four draws as failed and, being append-only, keeps draw #4 that way; the chain is the truth. Kill switch not tripped. **Don't draw again:** the faucet allows 1 grant per address per 24 h. |
 | Timers | **No FLOP timers installed.** The one-off `flopstar-flop-faucet-retry.timer` fired on 2 Nov and was disabled and deleted on 3 Nov. The task runner and recovery units (`deploy/flopstar-flop-run.*`, `flopstar-flop-recovery.*`) are **not installed**. |
@@ -529,16 +531,22 @@ was running, so nothing was interrupted. Fixed with the swap file and the contai
 
 **What blocks real spending** (each needs FLOP's testnet to land or an owner decision):
 - **Miner endpoints (S3):** `session run` needs a reachable miner session endpoint and none are
-  published, so `[<net>.miners]` is empty.
+  published, so `[<net>.miners]` is empty. On devnet this is the **only** blocker: everything else
+  (genesis, funded spend account, CLI, caps, escrow sizing) is in place.
 - **Gateway key (S4):** the gateway needs a funded API key; the only published enrolment creates an
   unencrypted wallet.
 - **Testnet details (S2/S5):** genesis hash, HTTPS RPC URL and the supported CLI build.
 - **DID-signed flow (S1):** if testnet credits only requests signed with the TechnoCore DID, design A
   has to be revisited (FLOP.md §7).
 
+**Next step on devnet** (once a miner operator gives an HTTPS session endpoint): add it under
+`[devnet.miners]` in `/etc/flopstar/flop.toml`, dry-run `ask --max-tokens 32`, then the owner runs
+it with `--post`. Check the settled outflow against the escrow and the reported prompt tokens
+against the estimate. Open owner decision: FLOP.md S13 (refunded rows count 0 against the day cap).
+
 **Next steps when testnet is live:** follow the go-live sequence at the end of FLOP.md §12, dry run
 first at every step and each `--post` only with the owner's go-ahead: pin the testnet genesis,
-`rpc_http_url`, miners and models in `/etc/flopstar/flop.toml`, then `status`, `faucet`, one `ask`,
+`rpc_http_url`, `min_escrow`, miners and models in `/etc/flopstar/flop.toml`, then `status`, `faucet`, one `ask`,
 `recovery`, Touchstone `check`/`register`, then decide on installing the task-runner and recovery
 timers. Back up the spend keystore and passphrase before it holds testnet funds.
 

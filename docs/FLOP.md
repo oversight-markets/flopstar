@@ -7,7 +7,8 @@ confirmed by a source is listed as a `SPEC:` question in §9.
 
 > **Decision (2026-11-01): key design A (§7).** The owner key does nothing on FLOP until FLOP
 > publishes the DID-signed flow (S1); a separate capped spend account pays escrow. Phases 0–7 are
-> built (§12); live spending waits on a CLI runtime here and FLOP's answers to S1, S3, S4.
+> built (§12), and escrow sizing was added 4 Nov. On devnet the first paid ask waits only on a
+> miner session endpoint (S3); testnet still waits on S1–S5.
 >
 > Original stop note: the published code does not
 > match the brief's key model: nothing links a `did:key` to a chain account, the faucet is not
@@ -390,6 +391,7 @@ band by the operator. Touchstone never holds streak keys: we generate and keep o
 | 7 | `flop/touchstone.py` | done (below); schema provisional until `touchstone check` passes against the real service |
 | 3 | `flop/client.py`, `flop/wallet.py`, `flop/faucet.py` | done: `status` (live-tested on devnet), spend keystore, faucet draws |
 | 4 | `flop/inference.py` | done: direct (CLI) and gateway routes, native refused (S1); CLI parsing tested on **synthetic** fixtures only |
+| 4b | `flop/estimate.py` | done 4 Nov: escrow sized from the public catalog (below) |
 | 5 | `flop/tasks.py`, `deploy/flopstar-flop-run.*` | done |
 | 6 | `flop/recovery.py`, `deploy/flopstar-flop-recovery.*` | done |
 
@@ -403,9 +405,48 @@ recovering→refunded|settled|failed.
 
 **Caps** are rolling windows (24 h for spend and faucet draws, 1 h for request count), checked in
 the same `BEGIN IMMEDIATE` transaction that inserts the `prepared` row. Spend counts `max_flop` in
-full until a row is refunded (0) or settled (`settled_flop`). A request that failed before it was
-sent counts 0. Every attempt counts toward the hourly request cap. Transaction fees are not counted
-(they're not in `max_flop`).
+full from authorize until a row is refunded (0) or settled with a recorded outflow
+(`settled_flop`). A request that failed before it was sent counts 0. Every attempt counts toward
+the hourly request cap. Transaction fees are not counted (they're not in `max_flop`).
+
+`settled_flop` is the agent's **real outflow**, escrow − refund, from the chain's settle/refund
+events or the spend account's balance change. It is never `miner_paid` or a claimed amount, and
+`transition` refuses one that is negative, malformed or above the escrow. Nothing writes it yet
+(S6), so a settle counts the full escrow. `FlopPolicy.check_request` holds the checks that don't
+depend on the amount (kill switch, route, model, miner, spent day budget, hourly requests);
+`check_inference` adds the amount checks, and `authorize_inference` always runs the full set.
+
+**Escrow sizing** (`flop/estimate.py`, 4 Nov). `flop session run --max-flop X` opens the channel
+with escrow exactly X, and a cooperative settle pays all of it: on the devnet settle at block
+2796872 (seen by Touchstone's indexer) escrow 0.804 = miner_paid + 1% `AuditFeeEarmarked`
+(0.00804), refund 0. The audit fee comes out of the escrow, not on top of it (`AuditFeePerTurn`
+is paid per claimed audit verdict from the earmark pool). So `ask` and `run` escrow an upper bound
+instead of the cap:
+
+```
+tokens = UTF-8 bytes of the prompt + TEMPLATE_TOKENS (40) + max_tokens
+cost   = tokens × max(pricing.prompt, pricing.completion)     # GET {gateway}/models, per token
+escrow = max(cost, [<network>].min_escrow)                   # devnet 0.05 FLOP
+```
+
+- Byte-level BPE never yields more regular tokens than bytes. The template allowance is checked
+  against the real Qwen2.5-0.5B-Instruct tokenizer (sha256-pinned fixture): the default chat
+  template with an empty user message is 29 tokens, and prompts that spell out special tokens
+  stay inside the bound.
+- Prices parse exactly to base units (more than 18 decimals is refused), and cost is int × int:
+  nothing is rounded.
+- The price is the gateway's model-wide price (`catalog_price_per_token`), not a quote from the
+  miner. For the direct route the chosen miner must have a price source with
+  `effective_at ≤ now < expires_at`. The miner that was priced is the one planned and sent.
+- `min_escrow` is `computeChannel.minForceOpenEscrowForFailedAck`, read from the devnet runtime
+  (spec 1014003). Testnet has none until it is read from the live runtime, so nothing is sized
+  there.
+- Fails closed: no catalog, a malformed or zero price, a duplicate model row, no live price for
+  the miner, or no `min_escrow` means no estimate, and the request is refused unless `--max-flop`
+  is given. `--max-flop` must be positive; below the estimate it only warns (the miner may refuse
+  the turn). Escrow above `max_flop_per_request` is refused, never clipped.
+- Cost: since the escrow is the bill, every ask pays its full bound (0.576 FLOP for a 32-token
+  ask with a 24-byte prompt at 0.006 FLOP/token), about 40 asks from a 25 FLOP faucet grant.
 
 **FlopPolicy** is the only module that may sign; a test greps the package for signing calls
 anywhere else. Its extrinsic allowlist is currently `ComputeChannel.{expire_force_open, timeout,
@@ -535,6 +576,10 @@ CLI has no expire/timeout command).
 - **S12.** After an SDK-side refund, `session run` exits non-zero but the escrow is back. The ledger
   keeps the row `failed` (counted at `max_flop`) because the CLI doesn't say which outcome happened.
   It needs the `Settled`/`TimedOutRefunded` event by tx (S6).
+- **S13.** A `refunded` row counts 0 against the day cap, which assumes a full refund. Recovery
+  marks `expire_force_open` and `timeout` rows `refunded` without reading the refunded amount; if
+  a timeout can pay the miner part of the escrow, the day cap undercounts. The safe fix (count the
+  escrow until a refund amount is recorded) awaits the owner's decision.
 
 ### Going live (testnet, 3 November): commands in order, all dry runs first
 
@@ -542,7 +587,8 @@ Prerequisites outside this repo:
 - Docker (or Node 22+) on the droplet.
 - FLOP's testnet genesis hash, HTTPS RPC URL and CLI build (S2/S5).
 - At least one testnet miner with a public session endpoint (S3).
-- `/etc/flopstar/flop.toml` from `deploy/flop.example.toml`, with `[testnet]` filled in.
+- `/etc/flopstar/flop.toml` from `deploy/flop.example.toml`, with `[testnet]` filled in,
+  including `min_escrow` read from the testnet runtime.
 
 ```bash
 export FLOPSTAR_FLOP_NETWORK=testnet FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
@@ -551,8 +597,10 @@ flopstar flop status                         # genesis "matches pin", spec suppo
 flopstar flop wallet setup                   # review, then:  wallet setup --post
 flopstar flop faucet                         # review, then:  faucet --post
 flopstar flop status                         # spend balance arrived
-flopstar flop ask --model <m> --prompt 'Reply OK.' --purpose research-notes --max-flop 0.01
-                                             # review plan, then add --post (one request)
+flopstar flop ask --model <m> --prompt 'Reply OK.' --purpose research-notes --max-tokens 32
+                                             # review plan and estimate, then add --post (one
+                                             # request); check the settled outflow against the
+                                             # escrow and the reported prompt tokens against size()
 flopstar flop recovery                       # nothing due
 flopstar flop touchstone status && flopstar flop touchstone check --spec openapi.json
 flopstar flop touchstone register --chain-account <spend SS58>   # then --post
