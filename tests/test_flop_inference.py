@@ -104,8 +104,8 @@ def test_cli_prefix_needs_a_runtime(tmp_path, monkeypatch):
     with pytest.raises(RouteUnavailable, match="Docker"):
         inference.cli_prefix(cfg, which=lambda _: None)
     prefix, keystore, version = inference.cli_prefix(cfg, which=docker)
-    assert prefix[-1].endswith("@sha256:fd97fab267e47bc69c40a014e562a69480cae7328dd0f139267ef940826fe223")
-    assert keystore == "/keys/spend.json" and version == "v0.1.418"
+    assert prefix[-1].endswith("@sha256:bddf38047b88c9b699474e090a6edd8345a51f986154c3c70f6eb676afcd06f8")
+    assert keystore == "/keys/spend.json" and version == "v0.1.455"
     assert f"{cfg.keystore_path.parent}:/keys:ro" in prefix
     # Memory, swap and process caps come before the image name.
     limits = prefix[:prefix.index(prefix[-1])]
@@ -234,7 +234,7 @@ def test_settled_direct_result_reports_to_touchstone(tmp_path, monkeypatch):
     r = direct(cfg, policy, FakeCli(stdout=SUCCESS))
     got = []
     settings = ts.TouchstoneSettings("http://10.0.0.5:8080", "tok", bytes(32))
-    status = inference.report(cfg, ledger, r, agent_did="did:key:z6Mktest", cli_version="v0.1.418",
+    status = inference.report(cfg, ledger, r, agent_did="did:key:z6Mktest", cli_version="v0.1.455",
                               settings=settings, transport=httpx.MockTransport(
                                   lambda req: got.append(json.loads(req.content)) or httpx.Response(201)))
     assert status == "sent" and ledger.get(r.spend_id)["touchstone_reported_at"]

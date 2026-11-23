@@ -14,10 +14,10 @@ since the agent was parked on 4 Nov, and the pinned versions no longer work agai
 The droplet also couldn't be reached over SSH, and testnet itself is still unpublished.
 
 *Progress since the assessment:* blockers 1 (the SDK pin) and 2 (the CLI image) were fixed in code
-on 22 Nov. **23 Nov, rechecked on the droplet:** `main` (`d475e64`) is deployed to `/opt/flopstar`.
+on 22 Nov, then again on 23 Nov (SDK 0.3.4, CLI v0.1.455, both run on the droplet). **23 Nov, rechecked on the droplet:** `main` (`d475e64`) is deployed to `/opt/flopstar`.
 No flopstar services or timers are loaded, and `KILL-flop` is absent. Devnet had already moved on
 to runtime **1014034**, which 0.3.3 refuses, so the SDK now pins 0.3.4 (blocker 1). FLOP also
-published a newer CLI image overnight, so blocker 2 is open again.
+published a newer CLI image overnight; it is now pinned and run on the droplet (blocker 2).
 
 ## Blocking issues
 
@@ -54,15 +54,35 @@ session creation (`per_tx_limit` and `daily_cap` become required keyword argumen
 doesn't use that path under key design A, but the workarounds in FLOP.md §2.3–2.5 need
 re-checking.
 
-### 2. The pinned FLOP command-line tool is stale again
+### 2. ~~The pinned FLOP command-line tool is stale~~ Re-pinned to v0.1.455 and run on the droplet
 
-**23 Nov: superseded.** `https://flop.network/releases.json` now names
+**23 Nov: re-pinned.** `https://flop.network/releases.json` now names
 `ghcr.io/flop-labs/flop-core/cli:v0.1.455@sha256:bddf38047b88c9b699474e090a6edd8345a51f986154c3c70f6eb676afcd06f8`
 (minimum still 0.1.172), and npm has `@flop-labs/cli` 0.8.0 and `@flop-labs/sdk` 0.9.0 (both
-23 Nov ~06:00 UTC). Our v0.1.418 bundles `@flop-labs/sdk` 0.7.2, which accepts runtimes only up to
-1014031, so it very likely refuses devnet's 1014034 (not run). **To do:** re-pin to v0.1.455 after
-the same checks as on 22 Nov (digest, bundled CLI/SDK versions and their runtime range, flags,
-`session run --json` fields, failure messages), then run it on the droplet (plan step 3).
+23 Nov ~06:00 UTC). v0.1.418 refuses devnet: a read-only `balance` from it on the droplet fails
+with `RUNTIME_INCOMPATIBLE` (spec 1014034). `flop/config.py` now pins v0.1.455 and
+`cli_npm_version` 0.8.0 for both profiles. Checked on the droplet, with both images pulled by
+digest:
+
+- The tag resolves to the pinned digest on GHCR. The image is `@flop-labs/cli` **0.8.0**
+  (`package.json`), bundling `@flop-labs/sdk` **0.9.0**, whose `SUPPORTED_SPEC_VERSIONS` includes
+  1014034 (range `1013000..1014034`).
+- `--version` → `0.1.455`. The global `--help` and `session run --help` match v0.1.418 exactly,
+  and every flag Flopstar passes is there.
+- In `dist/cli.js`, the `session run` success `print({...})` block and its `SESSION_FAILED`
+  handler are byte-identical to v0.1.418. The SDK's failure messages (`… (channel 0x…)`,
+  "direct session failed; on-chain recovery failed") are unchanged too, so the strict parser and
+  `parse_cli_failure` hold. On our path, the ~1,700 changed lines in `cli.js` are bundler renames.
+  The real changes are elsewhere (Hermes, `launch` for Claude Code/Codex, gateway keys and
+  evidence). The bundled SDK did change (0.7.2 → 0.9.0), and `runDirectSession` lives there. Its
+  result field names are unchanged, but its behaviour is untested until a real session runs.
+- Run like production (`--memory 640m --memory-swap 1g --pids-limit 256`, `--network host`):
+  read-only `health` and `balance` on the spend account work against devnet 1014034
+  (`connected: true`; balance 25 FLOP). Peak container memory was 230 MiB (cgroup
+  `memory.peak`), well inside 640 MiB on the 1 GB droplet.
+
+**Still open:** replace the synthetic fixtures with real `session run` output. That needs a
+devnet session, which needs a miner endpoint (blocker 5) and an owner-run `--post`.
 
 **Done 22 Nov:** `flop/config.py` pins
 `ghcr.io/flop-labs/flop-core/cli:v0.1.418@sha256:fd97fab267e47bc69c40a014e562a69480cae7328dd0f139267ef940826fe223`,
@@ -86,8 +106,8 @@ the Mac, droplet unreachable); its source was read statically:
   never persists and every run fetches. It fails before any escrow is locked; `--offline` would
   skip it, but Flopstar keeps the check.
 
-**Still open:** pull and run the image on the droplet (`--version` → `0.1.418`) within the
-container caps, and replace the synthetic fixtures with real output from a first devnet run.
+**Still open (22 Nov):** pull and run the image on the droplet within the caps. Superseded by the
+23 Nov re-pin above.
 
 The original finding: the direct route ran `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd`
 (`flop/config.py`). Current releases are `cli/v0.5.0` on GitHub and `@flop-labs/cli` 0.7.2 on
@@ -160,10 +180,11 @@ Even with everything else fixed, the agent can't buy inference until one of thes
 2. ~~Bump `flop-sdk` to 0.3.3, run the tests, and confirm `flop status` works against devnet
    1014031.~~ Done 22 Nov (`2651e25`). **23 Nov:** devnet moved to 1014034; bumped to 0.3.4,
    tests pass, devnet status healthy.
-3. Pin a current CLI image by digest: `v0.1.418` was pinned 22 Nov, but **23 Nov** FLOP published
-   `v0.1.455` (blocker 2), so re-pin first. Then on the droplet:
-   check that it runs within the container caps (`--memory 640m --memory-swap 1g
-   --pids-limit 256`) on the 1 GB droplet, and replace the synthetic fixtures with its real output.
+3. ~~Pin a current CLI image by digest and check that it runs within the container caps
+   (`--memory 640m --memory-swap 1g --pids-limit 256`) on the 1 GB droplet.~~ **23 Nov:** re-pinned
+   to `v0.1.455` (v0.1.418 refuses runtime 1014034); read-only `health`/`balance` run inside the
+   caps on the droplet, peaking at 230 MiB. **Still open:** replace the synthetic fixtures with
+   real `session run` output (needs a miner, blocker 5).
 4. ~~Re-read `min_escrow` from the new runtime and update the price tests.~~ Done 22 Nov:
    unchanged at 0.05 FLOP; `estimate.py` accepts the live catalog (new per-G_n fields ignored).
    **Owner decision:** at 0.000001 FLOP/token every ask escrows the 0.05 floor, ~500× its
@@ -198,4 +219,6 @@ for launch day is: chain status healthy, a faucet draw done, and the agent parke
 - 23 Nov: `flopstar flop status` from `/opt/flopstar` on the droplet (read-only, the run unit's
   environment); the `flop-sdk` 0.3.4 wheel and its diff from 0.3.3; `https://flop.network/releases.json`;
   npm `@flop-labs/cli` and `@flop-labs/sdk`; `ComputeChannel.MinForceOpenEscrowForFailedAck` on
-  `wss://rpc.devnet.flop.network`
+  `wss://rpc.devnet.flop.network`; GHCR manifest for `cli:v0.1.455`; images `cli:v0.1.418` and
+  `cli:v0.1.455` pulled by digest on the droplet (`--version`, `--help`, `dist/cli.js`, bundled SDK
+  `runtime-compatibility.js`, read-only `health`/`balance` inside the caps)

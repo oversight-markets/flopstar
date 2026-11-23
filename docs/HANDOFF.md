@@ -28,7 +28,7 @@ session endpoint (S3). State and next steps: **§10**. Design and sources: [FLOP
 the pinned `flop-sdk==0.2.0` refuses, and the pinned CLI image is stale. The droplet didn't answer
 SSH, and testnet details are still unpublished. Assessment and plan:
 [TESTNET-READINESS.md](TESTNET-READINESS.md). **23 Nov:** devnet moved to 1014034 (SDK now
-`0.3.4`), and FLOP published CLI image `v0.1.455`, so the CLI pin is stale again.
+`0.3.4`), and FLOP published CLI image `v0.1.455`, now pinned and run on the droplet.
 
 ---
 
@@ -532,7 +532,7 @@ still don't resolve. `flop status` is healthy (genesis matches pin, kill switch 
 | Kill switch | `/var/lib/flopstar/data/KILL-flop`: absent (clear). |
 | Ledger | `flop_spend`, `flop_spend_events`, `flop_faucet_draws` in `/var/lib/flopstar/data/flopstar.db` (append-only via triggers). Four rows: the four failed faucet draws. Signatures/authorisations log: `data/flop-signatures.log`. |
 | Touchstone | Configured and **registered** (agent row created 2026-11-03 16:26:53 UTC by `flopstar-touchstone-register`; the POST returned 500 because Touchstone's `AgentResponse.created_at` was typed `str`, a Touchstone bug confirmed in its logs, fixed by Touchstone PR #5; don't re-run registration). Verified 16:40 UTC: `GET /v1/agents` → 200 listing our DID, spend account and label `flopstar`. API `https://api.touchstone.gold` (public, via Caddy; the reporter's public-address warning is expected). Token: `/etc/flopstar/creds/touchstone-token.cred` (Touchstone's shared `API_TOKEN`, copied 3 Nov from `/root/var/www/touchstone/.env` on 147.182.159.190; authenticated `GET /v1/agents` → 200, 0 agents). Streak key: `/etc/flopstar/creds/touchstone-streak-key.cred`. Turns use `aes-256-gcm/v1` and Touchstone's `TurnRecord` (0 mismatches vs its spec at c00367e). Registration unit: `flopstar-touchstone-register` (one-shot; a repeat gets 400 "already exists" = success). `deploy/flopstar-flop-run.service` now carries the Touchstone settings. |
-| CLI runtime | Docker 29.1.3 (Ubuntu `docker.io`, updated by `unattended-upgrades`); pinned image `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd` pulled and verified (`--version` → `0.1.220`; `session run` accepts every flag we pass). **`main` pins `v0.1.418@sha256:fd97…e223` since 22 Nov** (`@flop-labs/cli` 0.7.1; checked statically, see [TESTNET-READINESS.md](TESTNET-READINESS.md) §2); not yet pulled or run on the droplet. Every CLI container runs with `--memory 640m --memory-swap 1g --pids-limit 256`. |
+| CLI runtime | Docker 29.1.3 (Ubuntu `docker.io`, updated by `unattended-upgrades`); pinned image `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd` pulled and verified (`--version` → `0.1.220`; `session run` accepts every flag we pass). **`main` pins `v0.1.455@sha256:bddf…06f8` since 23 Nov** (`@flop-labs/cli` 0.8.0, bundled SDK 0.9.0 admits runtime 1014034; see [TESTNET-READINESS.md](TESTNET-READINESS.md) §2). Pulled and verified on the droplet: `--version` → `0.1.455`, read-only `health`/`balance` work against devnet inside the caps (peak 230 MiB). The 22 Nov pin `v0.1.418` refuses runtime 1014034. Every CLI container runs with `--memory 640m --memory-swap 1g --pids-limit 256`. |
 | Host changes | Docker installed; `flopstar` in the `docker` group (§9); 2 GiB `/swapfile` (in `/etc/fstab`); kernel now `6.8.0-147-generic`. |
 
 **Incident, 1 Nov 17:55 UTC.** The droplet (961 MiB RAM, no swap then) hard-reset while an uncapped
