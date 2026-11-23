@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -737,7 +737,7 @@ wheels = [
 
 [[package]]
 name = "flop-sdk"
-version = "0.3.3"
+version = "0.3.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -746,9 +746,9 @@ dependencies = [
     { name = "substrate-interface" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/96/9f18aa670f82994ae799bd25a54d55e0af0a1631d6d0c418f677e5e3de21/flop_sdk-0.3.3.tar.gz", hash = "sha256:a1633540c3a4b7fca33325a27245b19fb1ad2499e92559175159f878c53f6763", size = 231605, upload-time = "2026-11-20T05:25:23.606Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/5d/ad1268b0a102086b723202fe0571ed94729a65ef02cf6cd18d1f92c83d67/flop_sdk-0.3.4.tar.gz", hash = "sha256:c7d136d34593ed1118bc6d86109fe12decf0ab0059cd8d6f3e3cb59f4d84302e", size = 231779, upload-time = "2026-11-23T05:51:48.242Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/af/adf0822af54ade315b2a042ffcc5657f12a6e33cdff1fbb96a93511cd873/flop_sdk-0.3.3-py3-none-any.whl", hash = "sha256:c70152bcc3bd71c79655b8faa743fdb1a4388b1c48e073f5bf557cc00c17e4e1", size = 58783, upload-time = "2026-11-20T05:25:22.611Z" },
+    { url = "https://files.pythonhosted.org/packages/88/92/09a27476dce543d8b9123d84218d66562ae1da6c41968c779b46757b2df0/flop_sdk-0.3.4-py3-none-any.whl", hash = "sha256:56b0f6403741b6f8761475168824f0a224f03c6c90c6bf57c5392b3c73ced718", size = 58939, upload-time = "2026-11-23T05:51:47.15Z" },
 ]
 
 [[package]]
@@ -779,7 +779,7 @@ dev = [
 requires-dist = [
     { name = "base58", specifier = ">=2.1.1" },
     { name = "cryptography", specifier = ">=42.0.0" },
-    { name = "flop-sdk", specifier = "==0.3.3" },
+    { name = "flop-sdk", specifier = "==0.3.4" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },

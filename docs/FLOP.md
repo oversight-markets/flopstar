@@ -365,7 +365,7 @@ band by the operator. Touchstone never holds streak keys: we generate and keep o
 5. `utils.sign_message` silently "signs" with a hash when PyNaCl is absent.
 6. Spec-version drift. The SDK hard-allowlists runtime versions and raises `RUNTIME_INCOMPATIBLE`
    on anything else. The docs promise forced upgrades during testnet, so each runtime upgrade can
-   halt Flopstar until a new `flop-sdk` ships (pinned `==0.3.3` since 22 Nov, which admits up to 1014031; a newer runtime needs another bump). Flopstar
+   halt Flopstar until a new `flop-sdk` ships (pinned `==0.3.4` since 23 Nov, which admits up to 1014034; a newer runtime needs another bump. Devnet went 1014031 → 1014034 between 22 and 23 Nov). Flopstar
    treats that as a kill-switch trip with a clear reason, not a crash loop.
 7. `langfuse` is a hard dependency. Harmless unless `init_tracing()` is called, but prompts and
    outputs would go to `cloud.langfuse.com` if anyone enabled it with `LANGFUSE_*` set. Flopstar
@@ -442,7 +442,7 @@ escrow = max(cost, [<network>].min_escrow)                   # devnet 0.05 FLOP
   miner. For the direct route the chosen miner must have a price source with
   `effective_at ≤ now < expires_at`. The miner that was priced is the one planned and sent.
 - `min_escrow` is `computeChannel.minForceOpenEscrowForFailedAck`, read from the devnet runtime
-  (spec 1014003; re-read unchanged at 0.05 FLOP at spec 1014031 on 22 Nov). The runtime doesn't
+  (spec 1014003; re-read unchanged at 0.05 FLOP at spec 1014031 on 22 Nov and 1014034 on 23 Nov). The runtime doesn't
   require it: per its metadata docs it is the smallest escrow for which a failed ack counts
   against the miner, and smaller opens still expire with a full refund. Flopstar uses it as a
   floor so that a miner who doesn't answer is held to account. Testnet has none until it is read from the live runtime, so nothing is sized

@@ -209,7 +209,7 @@ code is still in `src/flopstar/` and documented in [docs/TREE.md](docs/TREE.md),
 ## References
 
 - [FLOP docs](https://docs.flop.network) and [SDK references](https://docs.flop.network/docs/sdk-references)
-- [flop-sdk on PyPI](https://pypi.org/project/flop-sdk/) (pinned `==0.3.3`)
+- [flop-sdk on PyPI](https://pypi.org/project/flop-sdk/) (pinned `==0.3.4`)
 - [FLOP Network Releases](https://github.com/flop-labs/network/releases) - recommended by FLOP Labs for keeping up to date with FLOP
 
 ## License and author

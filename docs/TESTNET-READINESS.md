@@ -13,18 +13,29 @@ signed or posted.
 since the agent was parked on 4 Nov, and the pinned versions no longer work against FLOP's chain.
 The droplet also couldn't be reached over SSH, and testnet itself is still unpublished.
 
-*Progress since the assessment:* blockers 1 (the SDK pin) and 2 (the CLI image) are fixed in code
-(22 Nov), not yet deployed to the droplet.
+*Progress since the assessment:* blockers 1 (the SDK pin) and 2 (the CLI image) were fixed in code
+on 22 Nov. **23 Nov, rechecked on the droplet:** `main` (`d475e64`) is deployed to `/opt/flopstar`.
+No flopstar services or timers are loaded, and `KILL-flop` is absent. Devnet had already moved on
+to runtime **1014034**, which 0.3.3 refuses, so the SDK now pins 0.3.4 (blocker 1). FLOP also
+published a newer CLI image overnight, so blocker 2 is open again.
 
 ## Blocking issues
 
-### 1. ~~The pinned FLOP SDK is too old for the chain~~ Done in code, not yet deployed
+### 1. ~~The pinned FLOP SDK is too old for the chain~~ Done again for runtime 1014034
+
+**23 Nov: devnet runs 1014034; bumped to `flop-sdk==0.3.4`.** A read-only `flop status` from
+`/opt/flopstar` on 0.3.3 failed with `Unsupported runtime spec version 1014034`. `flop-sdk` 0.3.4
+(PyPI, 23 Nov 05:51 UTC) lists 1014034 in `SUPPORTED_SPEC_VERSIONS` (the range is now
+`1013000..1014034`; 1014032–1014033 aren't admitted). Its diff from 0.3.3 is only the version
+string and that list. Tests pass (260 passed; ruff clean). `flop status` against devnet: genesis
+matches the pin, spec 1014034, healthy. `min_escrow` (`ComputeChannel.MinForceOpenEscrowForFailedAck`)
+re-read at 1014034: still 0.05 FLOP. Expect more bumps like this: devnet moved twice in two days.
 
 **Done 22 Nov (`2651e25`):** `main` pins `flop-sdk==0.3.3`. Tests pass (253 passed, 5 skipped;
 ruff clean) and a read-only `flopstar flop status` against devnet now succeeds (genesis matches
 pin, spec 1014031, healthy). Every `flop_sdk` name Flopstar imports still exists. 0.3.3 also fixes
 the seed hazard in FLOP.md §2.3 (it now derives keys properly from mnemonics and hex seeds), which
-Flopstar never used. **Still open:** the droplet runs 0.2.0 until it's redeployed (plan step 7),
+Flopstar never used. **Still open:** ~~the droplet runs 0.2.0 until it's redeployed~~ (deployed 23 Nov),
 and 0.3.3's new `x402.py` module hasn't been checked against the "no native route" conclusion.
 
 The original finding: we pinned `flop-sdk==0.2.0` (`pyproject.toml`), which only accepts runtime spec versions up to
@@ -43,7 +54,15 @@ session creation (`per_tx_limit` and `daily_cap` become required keyword argumen
 doesn't use that path under key design A, but the workarounds in FLOP.md §2.3–2.5 need
 re-checking.
 
-### 2. ~~The pinned FLOP command-line tool is stale~~ Done in code, not yet run
+### 2. The pinned FLOP command-line tool is stale again
+
+**23 Nov: superseded.** `https://flop.network/releases.json` now names
+`ghcr.io/flop-labs/flop-core/cli:v0.1.455@sha256:bddf38047b88c9b699474e090a6edd8345a51f986154c3c70f6eb676afcd06f8`
+(minimum still 0.1.172), and npm has `@flop-labs/cli` 0.8.0 and `@flop-labs/sdk` 0.9.0 (both
+23 Nov ~06:00 UTC). Our v0.1.418 bundles `@flop-labs/sdk` 0.7.2, which accepts runtimes only up to
+1014031, so it very likely refuses devnet's 1014034 (not run). **To do:** re-pin to v0.1.455 after
+the same checks as on 22 Nov (digest, bundled CLI/SDK versions and their runtime range, flags,
+`session run --json` fields, failure messages), then run it on the droplet (plan step 3).
 
 **Done 22 Nov:** `flop/config.py` pins
 `ghcr.io/flop-labs/flop-core/cli:v0.1.418@sha256:fd97fab267e47bc69c40a014e562a69480cae7328dd0f139267ef940826fe223`,
@@ -135,11 +154,14 @@ Even with everything else fixed, the agent can't buy inference until one of thes
 
 ### Before launch
 
-1. Restore SSH access to the droplet. Confirm the services and timers are still stopped and
-   `KILL-flop` is absent.
+1. ~~Restore SSH access to the droplet. Confirm the services and timers are still stopped and
+   `KILL-flop` is absent.~~ **23 Nov:** checked from a session on the droplet itself (SSH from the
+   Mac not re-tested). Services and timers are stopped, and `KILL-flop` is absent.
 2. ~~Bump `flop-sdk` to 0.3.3, run the tests, and confirm `flop status` works against devnet
-   1014031.~~ Done 22 Nov (`2651e25`); deploys with step 7.
-3. ~~Pin a current CLI image by digest~~ (done 22 Nov: `v0.1.418`). Still to do on the droplet:
+   1014031.~~ Done 22 Nov (`2651e25`). **23 Nov:** devnet moved to 1014034; bumped to 0.3.4,
+   tests pass, devnet status healthy.
+3. Pin a current CLI image by digest: `v0.1.418` was pinned 22 Nov, but **23 Nov** FLOP published
+   `v0.1.455` (blocker 2), so re-pin first. Then on the droplet:
    check that it runs within the container caps (`--memory 640m --memory-swap 1g
    --pids-limit 256`) on the 1 GB droplet, and replace the synthetic fixtures with its real output.
 4. ~~Re-read `min_escrow` from the new runtime and update the price tests.~~ Done 22 Nov:
@@ -150,7 +172,9 @@ Even with everything else fixed, the agent can't buy inference until one of thes
 5. Back up the spend keystore and passphrase.
 6. Decide open question S13: should refunded requests count 0 against the daily cap
    (FLOP.md §12)?
-7. Deploy to `/opt/flopstar` (HANDOFF §7) and re-run `flop status` there.
+7. ~~Deploy to `/opt/flopstar` (HANDOFF §7) and re-run `flop status` there.~~ `d475e64` deployed
+   23 Nov (venv synced). Its status failed on runtime 1014034, which led to the 0.3.4 bump;
+   redeploy the bump and re-run status. Repeat after every SDK or CLI re-pin.
 
 ### On launch day
 
@@ -164,10 +188,14 @@ for launch day is: chain status healthy, a faucet draw done, and the agent parke
 
 - `gh release list -R flop-labs/network` (releases of 18 Nov: `cli/v0.5.0`, `sdk/v0.6.0`,
   `python-sdk/v0.3.0`, `node/v0.2.0`, …)
-- PyPI `flop-sdk` (latest 0.3.3); npm `@flop-labs/sdk` 0.8.0, `@flop-labs/cli` 0.7.2,
+- PyPI `flop-sdk` (latest 0.3.3 on 22 Nov; 0.3.4 on 23 Nov); npm `@flop-labs/sdk` 0.8.0, `@flop-labs/cli` 0.7.2,
   `@flop-labs/client` 0.2.2
 - `https://rpc.devnet.flop.network`: `state_getRuntimeVersion`, `chain_getBlockHash(0)`
 - `https://api.flop.network/v1/models`
 - `https://explorer.devnet.flop.network/api/session-offers`
 - DNS for the testnet hostnames
 - `https://docs.flop.network/docs/network-testnet`
+- 23 Nov: `flopstar flop status` from `/opt/flopstar` on the droplet (read-only, the run unit's
+  environment); the `flop-sdk` 0.3.4 wheel and its diff from 0.3.3; `https://flop.network/releases.json`;
+  npm `@flop-labs/cli` and `@flop-labs/sdk`; `ComputeChannel.MinForceOpenEscrowForFailedAck` on
+  `wss://rpc.devnet.flop.network`
