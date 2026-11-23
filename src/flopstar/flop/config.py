@@ -70,7 +70,8 @@ BUILTIN_PROFILES = {
             "ghcr.io/flop-labs/flop-core/cli:v0.1.418"
             "@sha256:fd97fab267e47bc69c40a014e562a69480cae7328dd0f139267ef940826fe223"
         ),
-        # Read from the devnet runtime (spec_version 1014003) on 2026-11-04.
+        # Read from the devnet runtime (spec_version 1014003) on 2026-11-04; re-read unchanged at
+        # spec 1014031 on 2026-11-22.
         min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
     ),
     # Status "planned", genesis policy "pin-before-live"; none of these hosts resolve yet.

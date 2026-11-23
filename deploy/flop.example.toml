@@ -9,7 +9,8 @@ network = "devnet"
 # override any of: rpc_url, rpc_http_url, faucet_url, gateway_url, indexer_url, mcp_url,
 # genesis_hash, cli_npm_version, cli_image.
 # Escrow floor (computeChannel.minForceOpenEscrowForFailedAck), read from the devnet runtime
-# (spec_version 1014003) on 4 Nov 2026. Every request escrows at least this much.
+# (spec_version 1014003) on 4 Nov 2026; unchanged at spec 1014031 on 22 Nov 2026. Every request
+# escrows at least this much.
 min_escrow = "0.05"
 
 [devnet.caps]

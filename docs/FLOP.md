@@ -442,14 +442,21 @@ escrow = max(cost, [<network>].min_escrow)                   # devnet 0.05 FLOP
   miner. For the direct route the chosen miner must have a price source with
   `effective_at ≤ now < expires_at`. The miner that was priced is the one planned and sent.
 - `min_escrow` is `computeChannel.minForceOpenEscrowForFailedAck`, read from the devnet runtime
-  (spec 1014003). Testnet has none until it is read from the live runtime, so nothing is sized
+  (spec 1014003; re-read unchanged at 0.05 FLOP at spec 1014031 on 22 Nov). The runtime doesn't
+  require it: per its metadata docs it is the smallest escrow for which a failed ack counts
+  against the miner, and smaller opens still expire with a full refund. Flopstar uses it as a
+  floor so that a miner who doesn't answer is held to account. Testnet has none until it is read from the live runtime, so nothing is sized
   there.
 - Fails closed: no catalog, a malformed or zero price, a duplicate model row, no live price for
   the miner, or no `min_escrow` means no estimate, and the request is refused unless `--max-flop`
   is given. `--max-flop` must be positive; below the estimate it only warns (the miner may refuse
   the turn). Escrow above `max_flop_per_request` is refused, never clipped.
-- Cost: since the escrow is the bill, every ask pays its full bound (0.576 FLOP for a 32-token
-  ask with a 24-byte prompt at 0.006 FLOP/token), about 40 asks from a 25 FLOP faucet grant.
+- Cost: since the escrow is the bill, every ask pays its full bound. At the 4 Nov price (0.006
+  FLOP/token) a 32-token ask with a 24-byte prompt cost 0.576 FLOP, about 40 asks from a 25 FLOP
+  faucet grant. At the 22 Nov price (0.000001 FLOP/token) the same ask costs 0.000096 FLOP but
+  escrows the 0.05 floor, about 500 asks per grant (100 per day at the 5 FLOP day cap). If a
+  cooperative settle still pays the whole escrow, each ask pays ~500× its catalog cost: the
+  price of keeping the floor.
 
 **FlopPolicy** is the only module that may sign; a test greps the package for signing calls
 anywhere else. Its extrinsic allowlist is currently `ComputeChannel.{expire_force_open, timeout,

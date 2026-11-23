@@ -86,13 +86,25 @@ def make_full(tmp_path, monkeypatch, clock=None):
     return cfg, ledger, FlopPolicy(cfg, ledger, now=clock), clock
 
 
-def catalog_body(price: str = "0.006", miners=None, expires_at: str = "2999-01-01T00:00:00Z",
+# Devnet catalog price per token for qwen2.5-0.5b on 22 Nov 2026 (runtime 1014031); was "0.006"
+# on 4 Nov. At this price every ordinary ask is sized at the 0.05 FLOP min_escrow floor.
+LIVE_PRICE = "0.000001"
+
+
+def catalog_body(price: str = LIVE_PRICE, miners=None, expires_at: str = "2999-01-01T00:00:00Z",
                  model: str = MODEL, effective_at: str = "2026-11-04T13:50:06.000Z") -> bytes:
-    """A `GET /models` body shaped like api.flop.network/v1/models (4 Nov 2026)."""
+    """A `GET /models` body shaped like api.flop.network/v1/models (22 Nov 2026).
+
+    Price sources carry the fields seen live on 22 Nov, including the per-G_n breakdown
+    (flop_per_gn x gn_per_*_token = the token price), which Flopstar ignores.
+    """
     import json
     miners = [SERVING, MINER] if miners is None else miners
     sources = [{"miner_address": m, "version": "chain:1", "source": "devnet-nominal",
-                "effective_at": effective_at, "expires_at": expires_at}
+                "effective_at": effective_at, "expires_at": expires_at,
+                "ratified_at": effective_at, "flop_per_gn": "0.0000005",
+                "gn_per_prompt_token": "2", "gn_per_completion_token": "2", "flop_usd": "1",
+                "rounding": {"mode": "ceil", "decimal_places": 12}}
                for m in miners]
     row = {"id": model, "object": "model", "pricing": {"prompt": price, "completion": price,
                                                        "input_cache_read": "0"},

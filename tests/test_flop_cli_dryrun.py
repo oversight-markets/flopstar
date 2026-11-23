@@ -94,9 +94,10 @@ def test_ask_post_runs_through_the_fake_cli(isolated, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "status: settled" in out and "untrusted model output" in out
     assert "touchstone: skipped" in out  # not configured in tests
-    # (2 prompt bytes + 40 template + 64 output) x 0.006 = 0.636 FLOP: the estimate, not the cap
+    # (2 prompt bytes + 40 template + 64 output) x 0.000001 = 0.000106 FLOP, under the 0.05 floor:
+    # the estimate (the floor), not the 1 FLOP cap
     argv = seen[0]
-    assert argv[argv.index("--max-flop") + 1] == "0.636"
+    assert argv[argv.index("--max-flop") + 1] == "0.05"
 
 
 def test_ask_defaults_to_the_estimate_not_the_ceiling(isolated, capsys):
@@ -105,13 +106,27 @@ def test_ask_defaults_to_the_estimate_not_the_ceiling(isolated, capsys):
     cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
                   "--miner", SERVING, "--max-tokens", "64"])
     out = capsys.readouterr().out
-    assert "max_flop: 0.636" in out and "max_flop_source: estimate" in out
+    assert "max_flop: 0.05" in out and "max_flop_source: estimate" in out
     assert "problems: []" in out
 
 
-def test_ask_refuses_when_estimate_exceeds_the_ceiling(isolated):
+def test_ask_sizes_above_the_floor_when_the_cost_is(isolated, monkeypatch, capsys):
+    # At the 4 Nov price (0.006): (2 + 40 + 64) x 0.006 = 0.636 FLOP, above the 0.05 floor.
     create_spend_keystore(isolated, "correct horse battery staple")
     roomy_caps(isolated)
+    monkeypatch.setitem(cli.HOOKS, "transport",
+                        catalog_transport(catalog_body(price="0.006"), also=explode))
+    cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",
+                  "--miner", SERVING, "--max-tokens", "64"])
+    out = capsys.readouterr().out
+    assert "max_flop: 0.636" in out and "max_flop_source: estimate" in out
+
+
+def test_ask_refuses_when_estimate_exceeds_the_ceiling(isolated, monkeypatch):
+    create_spend_keystore(isolated, "correct horse battery staple")
+    roomy_caps(isolated)
+    monkeypatch.setitem(cli.HOOKS, "transport",
+                        catalog_transport(catalog_body(price="0.006"), also=explode))
     # 512 default output tokens x 0.006 = over 3 FLOP: refused, never clipped to the ceiling.
     with pytest.raises(SystemExit, match="exceeds max_flop_per_request"):
         cli.run_flop(["ask", "--model", MODEL, "--prompt", "hi", "--purpose", "t",

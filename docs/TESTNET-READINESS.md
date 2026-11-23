@@ -113,7 +113,7 @@ Even with everything else fixed, the agent can't buy inference until one of thes
 
 | Change | Effect |
 |---|---|
-| Gateway price for `qwen/qwen2.5-0.5b-instruct` dropped from `0.006` to `0.000001` per token (~6,000×) | Every request is now sized at the `min_escrow` floor. `min_escrow` (0.05 FLOP) was read from runtime 1014003 and must be re-read from the new runtime; tests that assume the old price need updating. |
+| Gateway price for `qwen/qwen2.5-0.5b-instruct` dropped from `0.006` to `0.000001` per token (~6,000×) | Every request is now sized at the `min_escrow` floor. **Done 22 Nov:** `min_escrow` re-read at runtime 1014031, unchanged at 0.05 FLOP; the price tests now use the live price and catalog shape (step 4). |
 | Two new models: `qwen/qwen3-14b` (`0.000015`), `qwen/qwen3-coder-30b-a3b-instruct-fp8` (`0.0000035`) | `allowed_models` only lists qwen2.5-0.5b. Fine unless the others are wanted. |
 | TS SDK 0.6.0: a successful faucet response can't be bound to the grant transaction | Matches our draw #4 (HANDOFF §10). Keep treating the chain balance as the truth. |
 | FLOP published versioned `node`, `miner`, `miner-worker`, `da-validator` images (`v0.2.0`, 18 Nov) | More miners may come up for testnet, which could help with item 5. |
@@ -142,7 +142,11 @@ Even with everything else fixed, the agent can't buy inference until one of thes
 3. ~~Pin a current CLI image by digest~~ (done 22 Nov: `v0.1.418`). Still to do on the droplet:
    check that it runs within the container caps (`--memory 640m --memory-swap 1g
    --pids-limit 256`) on the 1 GB droplet, and replace the synthetic fixtures with its real output.
-4. Re-read `min_escrow` from the new runtime and update the price tests.
+4. ~~Re-read `min_escrow` from the new runtime and update the price tests.~~ Done 22 Nov:
+   unchanged at 0.05 FLOP; `estimate.py` accepts the live catalog (new per-G_n fields ignored).
+   **Owner decision:** at 0.000001 FLOP/token every ask escrows the 0.05 floor, ~500× its
+   catalog cost if a settle still pays the whole escrow. Keep the floor (a miner who doesn't
+   answer is held to account), or size below it on devnet (FLOP.md §12)?
 5. Back up the spend keystore and passphrase.
 6. Decide open question S13: should refunded requests count 0 against the daily cap
    (FLOP.md §12)?
