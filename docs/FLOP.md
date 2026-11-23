@@ -362,7 +362,7 @@ band by the operator. Touchstone never holds streak keys: we generate and keep o
 5. `utils.sign_message` silently "signs" with a hash when PyNaCl is absent.
 6. Spec-version drift. The SDK hard-allowlists runtime versions and raises `RUNTIME_INCOMPATIBLE`
    on anything else. The docs promise forced upgrades during testnet, so each runtime upgrade can
-   halt Flopstar until a new `flop-sdk` ships (we pin `==0.2.0`, so we'd need to bump it). Flopstar
+   halt Flopstar until a new `flop-sdk` ships (pinned `==0.3.3` since 22 Nov, which admits up to 1014031; a newer runtime needs another bump). Flopstar
    treats that as a kill-switch trip with a clear reason, not a crash loop.
 7. `langfuse` is a hard dependency. Harmless unless `init_tracing()` is called, but prompts and
    outputs would go to `cloud.langfuse.com` if anyone enabled it with `LANGFUSE_*` set. Flopstar

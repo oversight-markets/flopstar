@@ -521,7 +521,7 @@ still don't resolve. `flop status` is healthy (genesis matches pin, kill switch 
 
 | Item | State |
 |---|---|
-| Code | Phases 0–7 complete in `src/flopstar/flop/`, pushed to `main` and deployed to `/opt/flopstar` (venv synced; `flop-sdk==0.2.0`). |
+| Code | Phases 0–7 complete in `src/flopstar/flop/`, pushed to `main` and deployed to `/opt/flopstar` (venv synced; `flop-sdk==0.2.0` deployed; `main` pins `0.3.3` since 22 Nov, not yet deployed). |
 | Key design | **A**: the owner key (`flopstar.pem`) does nothing on FLOP. A separate sr25519 **spend account** pays escrow; its balance plus FlopPolicy's caps bound spending. Only `flop/policy.py` signs or launches the signing CLI. |
 | Network | **devnet** (earns nothing). `/etc/flopstar/flop.toml` (0640 root:flopstar): genesis pinned `0x99c1…d631`, `min_escrow = "0.05"`, caps **1 FLOP/request, 5/day** (raised from 0.01 / 0.5 on 4 Nov after review; backup `/etc/flopstar/flop.toml.bak-20261104`), 6 requests/h, 1 faucet draw/day, model `qwen/qwen2.5-0.5b-instruct`, **no miners listed**, empty blocklist. |
 | Escrow sizing | Since 4 Nov (`2da4302`, deployed to `/opt/flopstar`): each ask escrows an estimate from the gateway's public catalog, not the cap, because a settle pays the whole escrow (FLOP.md §12). A dry run as `flopstar` (32 tokens, 24-byte prompt) sized 0.576 FLOP and was refused only for the empty `[devnet.miners]`. |

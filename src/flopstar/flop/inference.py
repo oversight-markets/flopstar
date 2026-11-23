@@ -350,7 +350,7 @@ def run_gateway(cfg: FlopConfig, policy: FlopPolicy, *, model: str, prompt: str,
 
 
 def run_native(**_) -> Result:
-    raise RouteUnavailable("native route: flop-sdk 0.2.0 has no inference-request or DID-signed "
+    raise RouteUnavailable("native route: flop-sdk has no inference-request or DID-signed "
                            "flow (docs/FLOP.md S1)")
 
 
