@@ -13,11 +13,21 @@ signed or posted.
 since the agent was parked on 4 Nov, and the pinned versions no longer work against FLOP's chain.
 The droplet also couldn't be reached over SSH, and testnet itself is still unpublished.
 
+*Progress since the assessment:* blocker 1 (the SDK pin) is fixed in code (22 Nov), not yet
+deployed to the droplet.
+
 ## Blocking issues
 
-### 1. The pinned FLOP SDK is too old for the chain
+### 1. ~~The pinned FLOP SDK is too old for the chain~~ Done in code, not yet deployed
 
-We pin `flop-sdk==0.2.0` (`pyproject.toml`), which only accepts runtime spec versions up to
+**Done 22 Nov (`2651e25`):** `main` pins `flop-sdk==0.3.3`. Tests pass (253 passed, 5 skipped;
+ruff clean) and a read-only `flopstar flop status` against devnet now succeeds (genesis matches
+pin, spec 1014031, healthy). Every `flop_sdk` name Flopstar imports still exists. 0.3.3 also fixes
+the seed hazard in FLOP.md §2.3 (it now derives keys properly from mnemonics and hex seeds), which
+Flopstar never used. **Still open:** the droplet runs 0.2.0 until it's redeployed (plan step 7),
+and 0.3.3's new `x402.py` module hasn't been checked against the "no native route" conclusion.
+
+The original finding: we pinned `flop-sdk==0.2.0` (`pyproject.toml`), which only accepts runtime spec versions up to
 1014011 (`SUPPORTED_SPEC_VERSION_RANGE = (1_013_000, 1_014_011)`). Devnet now runs **1014031**
 (same genesis `0x99c1…d631`). A read-only `flopstar flop status` against devnet fails:
 
@@ -102,7 +112,8 @@ Even with everything else fixed, the agent can't buy inference until one of thes
 
 1. Restore SSH access to the droplet. Confirm the services and timers are still stopped and
    `KILL-flop` is absent.
-2. Bump `flop-sdk` to 0.3.3, run the tests, and confirm `flop status` works against devnet 1014031.
+2. ~~Bump `flop-sdk` to 0.3.3, run the tests, and confirm `flop status` works against devnet
+   1014031.~~ Done 22 Nov (`2651e25`); deploys with step 7.
 3. Pin a current CLI image by digest, check that it runs within the container caps
    (`--memory 640m --memory-swap 1g --pids-limit 256`) on the 1 GB droplet, and update the parser
    and test fixtures to its real output.
