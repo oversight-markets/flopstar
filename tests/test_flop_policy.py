@@ -92,8 +92,8 @@ def test_daily_cap_holds_across_restarts(tmp_path, monkeypatch):
 
 
 def test_daily_cap_counts_in_flight_escrow_at_open(tmp_path, monkeypatch):
-    # Committed escrow counts in full from authorize (before the channel opens) until it is
-    # settled or refunded, so concurrent asks cannot overshoot max_flop_per_day together.
+    # Committed escrow counts in full from authorize (before the channel opens), so concurrent
+    # asks cannot overshoot max_flop_per_day together. Only a recorded settle outflow counts less.
     _, ledger, policy, clock = make(tmp_path, monkeypatch)
     sids = []
     for i in range(5):  # 5 x 0.01 = the 0.05 day cap, none settled
@@ -122,15 +122,21 @@ def test_hourly_request_cap_and_window(tmp_path, monkeypatch):
     assert policy.check_inference("direct", MODEL, MINER, 1) == []
 
 
-def test_refunds_and_unsent_failures_free_the_budget(tmp_path, monkeypatch):
+def test_refunds_count_full_escrow_and_unsent_failures_free_the_budget(tmp_path, monkeypatch):
+    # S13 (owner decision 23 Nov): a refunded request counts its full escrow, sent directly or
+    # via recovery, since the refunded amount isn't read. A request never sent counts 0.
     _, ledger, policy, _ = make(tmp_path, monkeypatch)
-    a, b, c = ask(policy, 1), ask(policy, 2), ask(policy, 3)
+    a, b, c, d = ask(policy, 1), ask(policy, 2), ask(policy, 3), ask(policy, 4)
     ledger.transition(a, "sent")
     ledger.transition(a, "refunded")
     ledger.transition(b, "failed")  # never sent
     ledger.transition(c, "sent")
     ledger.transition(c, "settled", settled_flop=CENT // 4)
-    assert policy.budget().spent_today == CENT // 4
+    ledger.transition(d, "sent")
+    ledger.transition(d, "failed")
+    ledger.transition(d, "recovering")
+    ledger.transition(d, "refunded")  # expire_force_open / timeout recovery
+    assert policy.budget().spent_today == CENT + CENT // 4 + CENT
 
 
 def test_kill_switch_blocks_everything(tmp_path, monkeypatch):

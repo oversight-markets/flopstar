@@ -556,7 +556,7 @@ was running, so nothing was interrupted. Fixed with the swap file and the contai
 **Next step on devnet** (once a miner operator gives an HTTPS session endpoint): add it under
 `[devnet.miners]` in `/etc/flopstar/flop.toml`, dry-run `ask --max-tokens 32`, then the owner runs
 it with `--post`. Check the settled outflow against the escrow and the reported prompt tokens
-against the estimate. Open owner decision: FLOP.md S13 (refunded rows count 0 against the day cap). Decided 23 Nov: keep the `min_escrow` floor (FLOP.md §12).
+against the estimate. Decided 23 Nov: keep the `min_escrow` floor (FLOP.md §12), and a refunded request counts its full escrow against the day cap (FLOP.md S13).
 
 **Next steps when testnet is live:** follow the go-live sequence at the end of FLOP.md §12, dry run
 first at every step and each `--post` only with the owner's go-ahead: pin the testnet genesis,

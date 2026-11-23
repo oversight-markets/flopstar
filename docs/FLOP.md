@@ -588,10 +588,13 @@ CLI has no expire/timeout command).
 - **S12.** After an SDK-side refund, `session run` exits non-zero but the escrow is back. The ledger
   keeps the row `failed` (counted at `max_flop`) because the CLI doesn't say which outcome happened.
   It needs the `Settled`/`TimedOutRefunded` event by tx (S6).
-- **S13.** A `refunded` row counts 0 against the day cap, which assumes a full refund. Recovery
-  marks `expire_force_open` and `timeout` rows `refunded` without reading the refunded amount; if
-  a timeout can pay the miner part of the escrow, the day cap undercounts. The safe fix (count the
-  escrow until a refund amount is recorded) awaits the owner's decision.
+- **S13.** ~~A `refunded` row counts 0 against the day cap, which assumes a full refund.~~
+  Recovery marks `expire_force_open` and `timeout` rows `refunded` without reading the refunded
+  amount; if a timeout can pay the miner part of the escrow, counting 0 undercounts the day cap.
+  **Owner decision, 23 Nov: a refunded request counts its full escrow** (`ledger.spent_since`),
+  whether refunded directly or via recovery. Refunds therefore use up the day's budget: at the
+  0.05 FLOP floor and the 5 FLOP day cap, that's 100 asks a day whatever their outcome. Revisit if
+  refund amounts are ever read from chain events (S6).
 
 ### Going live (testnet, 3 November): commands in order, all dry runs first
 

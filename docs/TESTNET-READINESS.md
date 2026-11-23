@@ -232,8 +232,9 @@ Even with everything else fixed, the agent can't buy inference until one of thes
    miner who doesn't answer is held to account (FLOP.md §12). Re-read at 1014034 on 23 Nov:
    still 0.05. No code change; testnet uses whatever its runtime reports.
 5. Back up the spend keystore and passphrase.
-6. Decide open question S13: should refunded requests count 0 against the daily cap
-   (FLOP.md §12)?
+6. ~~Decide open question S13: should refunded requests count 0 against the daily cap
+   (FLOP.md §12)?~~ **Owner decision (23 Nov): count refunded requests at their full escrow.**
+   Done in `ledger.spent_since`, with the test covering a direct refund and a recovery refund.
 7. ~~Deploy to `/opt/flopstar` (HANDOFF §7) and re-run `flop status` there.~~ `d475e64` deployed
    23 Nov (venv synced). Its status failed on runtime 1014034, which led to the 0.3.4 bump;
    redeploy the bump and re-run status. Repeat after every SDK or CLI re-pin. **23 Nov:** 0.3.4

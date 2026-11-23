@@ -14,7 +14,7 @@ settle/refund events or the spend account's balance change. It is never miner_pa
 amount: the 1% audit earmark also comes out of the escrow, and the devnet settle at block 2796872
 refunded nothing, so a claim below the escrow can still mean the whole escrow was spent. Nothing
 writes it yet (the CLI does not report an amount, SPEC S6), so a settled request counts its full
-escrow. Cap checks and inserts share one BEGIN IMMEDIATE transaction (see `transaction`), so
+escrow. A refunded request always counts its full escrow against the day cap (S13). Cap checks and inserts share one BEGIN IMMEDIATE transaction (see `transaction`), so
 concurrent runs cannot both pass a cap.
 """
 
@@ -273,8 +273,10 @@ class Ledger:
     def spent_since(self, network: str, since: datetime) -> int:
         """
         Base units committed since `since`. Conservative: escrow counts in full from authorize
-        until it is settled with a recorded outflow (`settled_flop` = escrow - refund, never the
-        claimed amount) or refunded; a request that failed before it was sent counts 0.
+        on. Only a settle with a recorded outflow (`settled_flop` = escrow - refund, never the
+        claimed amount) counts less. A refunded request also counts its full escrow (S13, owner
+        decision 23 Nov): recovery doesn't read the refunded amount, and a timeout might pay the
+        miner part of it. A request that failed before it was sent counts 0.
         Transaction fees are not included (they are not in max_flop).
         """
         rows = self.conn.execute(
@@ -285,7 +287,7 @@ class Ledger:
         )
         total = 0
         for r in rows:
-            if r["status"] == "refunded" or (r["status"] == "failed" and not r["was_sent"]):
+            if r["status"] == "failed" and not r["was_sent"]:
                 continue
             if r["status"] == "settled" and r["settled_flop"] is not None:
                 total += raw_from_str(r["settled_flop"])
