@@ -24,6 +24,11 @@ not up on the day) and spends nothing. FLOP opened devnet to builders on 3 Nov, 
 agent is ready to buy on devnet (escrow sizing, 1 / 5 FLOP caps): the only blocker there is a miner
 session endpoint (S3). State and next steps: **§10**. Design and sources: [FLOP.md](FLOP.md).
 
+**Update, 22 Nov 2026 (testnet in two days): not ready.** Devnet now runs runtime 1014031, which
+the pinned `flop-sdk==0.2.0` refuses, and the pinned CLI image is stale. The droplet didn't answer
+SSH, and testnet details are still unpublished. Assessment and plan:
+[TESTNET-READINESS.md](TESTNET-READINESS.md).
+
 ---
 
 ## 1. State (4 Oct 2026, 14:45 UTC): final
@@ -498,6 +503,11 @@ SELECT json_extract(json_extract(raw_json, '$.text'), '$.t') AS t, COUNT(*) FROM
 Flopstar's second job: buy useful inference on the FLOP Network, keep a verifiable record of every
 purchase, and report it to Touchstone. The full design, sources, open questions (S1–S12) and the
 go-live sequence are in [FLOP.md](FLOP.md); this section is the operational state.
+
+**Testnet readiness (22 Nov 2026):** not ready; see [TESTNET-READINESS.md](TESTNET-READINESS.md)
+for the blockers (SDK and CLI pins too old for runtime 1014031, droplet unreachable over SSH,
+testnet unpublished, no miner endpoints) and the plan before launch. It supersedes the
+"ready to buy on devnet" state below.
 
 **Decision (owner, 1 Nov):** don't ask FLOP about the open questions; testnet (target Tue 3 Nov,
 not yet live, hostnames don't resolve) should answer them. Until then the agent spends nothing.
