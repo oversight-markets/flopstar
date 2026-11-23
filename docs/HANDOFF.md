@@ -523,10 +523,15 @@ applies security updates daily. These changes were made:
   `protected_fifos`/`protected_regular = 2`. It's safe with `ip_forward = 1`, which Docker needs.
 
 Open follow-ups, in priority order:
-- [ ] Sandbox the flopstar units. `systemd-analyze security` scores all seven at 8.3 (EXPOSED).
-  Start with `NoNewPrivileges`, `ProtectSystem=strict` plus `ReadWritePaths=/var/lib/flopstar`,
-  `ProtectHome`, `PrivateTmp`, and `CapabilityBoundingSet=`. Test against `flopstar-signer@verify`
-  before any signing step.
+- [x] Sandbox the flopstar units (23 Nov). Every `deploy/*.service` now adds kernel, device, proc,
+  namespace, capability (`CapabilityBoundingSet=`), address-family and syscall (`@system-service`
+  minus `@privileged @resources`) restrictions, `UMask=0077`, and `PrivateUsers=true` everywhere
+  except `flopstar-flop-run` (it needs the `docker` group). `systemd-analyze security` went from 8.3
+  (EXPOSED) to 1.1 (OK) on all seven installed units. Tested before install with transient units
+  under the same settings: `trader status`, `room status`, `flop config`, `flop status`, data-dir
+  writes, credential decryption (seed and passphrase), and `docker version` for the flop-run profile.
+  The previous units are in `/root/systemd-backup-20261123`. `MemoryDenyWriteExecute` was left off
+  (cffi and JIT-style code can need W+X); add it only after a full live run.
 - [ ] The `flopstar` user in the `docker` group (above) is still root-equivalent. Fixing it means
   changing how `flopstar-flop-run` calls Docker, for example rootless Docker or a narrow root helper.
 - [ ] Ubuntu Pro (free for up to 5 machines): `pro attach <token>` enables Livepatch (kernel fixes without
