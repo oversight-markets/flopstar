@@ -313,6 +313,9 @@ Alternatives, if FLOP confirms the DID account is what must spend on testnet:
   (the `@flop-labs/contracts` schema may say)? What are the units of `pricing.prompt = "0.006"`?
 - **S5. CLI version lines.** npm `@flop-labs/cli` is 0.4.0, the container in `releases.json` is
   `v0.1.220`. Are they the same code? Which does FLOP support for testnet `session run`?
+  *Partly answered 22 Nov:* the container is built from the npm package (image `v0.1.418` holds
+  `@flop-labs/cli` 0.7.1 per its `package.json`). Which build FLOP supports on testnet is still
+  open.
 - **S6. Settled amount and evidence.** `session run --json` reports neither the settled amount nor
   receipt contents or token IDs. Read `Settled.minerPaid` from chain events by `settle_tx`? Is there
   a CLI flag (or SDK call) that exports the verified receipts/transcript for Touchstone?

@@ -13,8 +13,8 @@ signed or posted.
 since the agent was parked on 4 Nov, and the pinned versions no longer work against FLOP's chain.
 The droplet also couldn't be reached over SSH, and testnet itself is still unpublished.
 
-*Progress since the assessment:* blocker 1 (the SDK pin) is fixed in code (22 Nov), not yet
-deployed to the droplet.
+*Progress since the assessment:* blockers 1 (the SDK pin) and 2 (the CLI image) are fixed in code
+(22 Nov), not yet deployed to the droplet.
 
 ## Blocking issues
 
@@ -43,9 +43,34 @@ session creation (`per_tx_limit` and `daily_cap` become required keyword argumen
 doesn't use that path under key design A, but the workarounds in FLOP.md §2.3–2.5 need
 re-checking.
 
-### 2. The pinned FLOP command-line tool is stale
+### 2. ~~The pinned FLOP command-line tool is stale~~ Done in code, not yet run
 
-The direct route runs `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd`
+**Done 22 Nov:** `flop/config.py` pins
+`ghcr.io/flop-labs/flop-core/cli:v0.1.418@sha256:fd97fab267e47bc69c40a014e562a69480cae7328dd0f139267ef940826fe223`,
+the image `https://flop.network/releases.json` names. GHCR confirms the tag resolves to that
+digest, and the downloaded layers matched their digests. The image wasn't run (no Docker daemon on
+the Mac, droplet unreachable); its source was read statically:
+
+- It is `@flop-labs/cli` **0.7.1** (the image's `package.json`), bundling `@flop-labs/sdk` 0.7.2,
+  which accepts runtimes up to **1014031**. So the container tag and the npm version are the same
+  code (S5's first half), and `cli_npm_version` is now 0.7.1 for both profiles.
+- Every global flag and `session run` flag Flopstar passes still exists with the same meaning.
+- `session run --json` prints the same fields (`reply`, `miner`, `channel`, `settle_tx`,
+  `cooperative`, `verified_turns`, `finish_reason`, `completion_tokens`; `wallet` only with
+  `--new-wallet`), so the strict parser holds.
+- Failures still end the message with `(channel 0x…)` and still say "on-chain recovery failed",
+  so `parse_cli_failure` holds. The stderr JSON also gains `channel`, `recovery` and
+  `diagnostics` fields, which the parser ignores.
+- **New:** an operator release check. Before any command that isn't read-only (including
+  `session run`), the CLI fetches `releases.json` and refuses to run if the fetch fails or the CLI
+  is below FLOP's published minimum (now 0.1.172). Our containers are `--rm`, so its one-day cache
+  never persists and every run fetches. It fails before any escrow is locked; `--offline` would
+  skip it, but Flopstar keeps the check.
+
+**Still open:** pull and run the image on the droplet (`--version` → `0.1.418`) within the
+container caps, and replace the synthetic fixtures with real output from a first devnet run.
+
+The original finding: the direct route ran `ghcr.io/flop-labs/flop-core/cli:v0.1.220@sha256:c8f3…bbbd`
 (`flop/config.py`). Current releases are `cli/v0.5.0` on GitHub and `@flop-labs/cli` 0.7.2 on
 npm (20 Nov). The matching TS SDK 0.6.0 adds support for runtimes 1014015–1014020 and fixes
 faucet retries and unknown settlement outcomes.
@@ -114,9 +139,9 @@ Even with everything else fixed, the agent can't buy inference until one of thes
    `KILL-flop` is absent.
 2. ~~Bump `flop-sdk` to 0.3.3, run the tests, and confirm `flop status` works against devnet
    1014031.~~ Done 22 Nov (`2651e25`); deploys with step 7.
-3. Pin a current CLI image by digest, check that it runs within the container caps
-   (`--memory 640m --memory-swap 1g --pids-limit 256`) on the 1 GB droplet, and update the parser
-   and test fixtures to its real output.
+3. ~~Pin a current CLI image by digest~~ (done 22 Nov: `v0.1.418`). Still to do on the droplet:
+   check that it runs within the container caps (`--memory 640m --memory-swap 1g
+   --pids-limit 256`) on the 1 GB droplet, and replace the synthetic fixtures with its real output.
 4. Re-read `min_escrow` from the new runtime and update the price tests.
 5. Back up the spend keystore and passphrase.
 6. Decide open question S13: should refunded requests count 0 against the daily cap

@@ -53,7 +53,8 @@ class NetworkProfile:
 
 
 # sdk:chain.js FLOP_NETWORK_PROFILES; devnet genesis and HTTPS RPC observed 2026-11-01 (FLOP.md §4);
-# CLI image pin from https://flop.network/releases.json on 2026-11-01.
+# CLI image pin from https://flop.network/releases.json on 2026-11-22 (v0.1.418 = @flop-labs/cli
+# 0.7.1 per the image's package.json, bundling @flop-labs/sdk 0.7.2: runtimes up to 1014031).
 BUILTIN_PROFILES = {
     "devnet": NetworkProfile(
         name="devnet",
@@ -64,10 +65,10 @@ BUILTIN_PROFILES = {
         indexer_url="https://explorer.devnet.flop.network",
         mcp_url="https://mcp.flop.network/mcp",
         genesis_hash="0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
-        cli_npm_version="0.4.0",
+        cli_npm_version="0.7.1",
         cli_image=(
-            "ghcr.io/flop-labs/flop-core/cli:v0.1.220"
-            "@sha256:c8f3456c48d41cec9d0229d1e1dd9eb8d6247a22f350c51078d85f129601bbbd"
+            "ghcr.io/flop-labs/flop-core/cli:v0.1.418"
+            "@sha256:fd97fab267e47bc69c40a014e562a69480cae7328dd0f139267ef940826fe223"
         ),
         # Read from the devnet runtime (spec_version 1014003) on 2026-11-04.
         min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
@@ -85,7 +86,7 @@ BUILTIN_PROFILES = {
         mcp_url=None,
         # SPEC(S2): pin before use; refuse to run until set in the config file.
         genesis_hash=None,
-        cli_npm_version="0.4.0",
+        cli_npm_version="0.7.1",
         cli_image=None,  # SPEC(S5): which CLI build FLOP supports on testnet
         min_escrow=None,  # read it from the testnet runtime once live
     ),
