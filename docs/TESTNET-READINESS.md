@@ -187,9 +187,10 @@ Even with everything else fixed, the agent can't buy inference until one of thes
    real `session run` output (needs a miner, blocker 5).
 4. ~~Re-read `min_escrow` from the new runtime and update the price tests.~~ Done 22 Nov:
    unchanged at 0.05 FLOP; `estimate.py` accepts the live catalog (new per-G_n fields ignored).
-   **Owner decision:** at 0.000001 FLOP/token every ask escrows the 0.05 floor, ~500× its
-   catalog cost if a settle still pays the whole escrow. Keep the floor (a miner who doesn't
-   answer is held to account), or size below it on devnet (FLOP.md §12)?
+   **Owner decision (23 Nov): keep the floor.** At 0.000001 FLOP/token every ask escrows 0.05 FLOP,
+   ~500× its catalog cost if a settle still pays the whole escrow. That is accepted so that a
+   miner who doesn't answer is held to account (FLOP.md §12). Re-read at 1014034 on 23 Nov:
+   still 0.05. No code change; testnet uses whatever its runtime reports.
 5. Back up the spend keystore and passphrase.
 6. Decide open question S13: should refunded requests count 0 against the daily cap
    (FLOP.md §12)?

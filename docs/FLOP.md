@@ -456,7 +456,9 @@ escrow = max(cost, [<network>].min_escrow)                   # devnet 0.05 FLOP
   faucet grant. At the 22 Nov price (0.000001 FLOP/token) the same ask costs 0.000096 FLOP but
   escrows the 0.05 floor, about 500 asks per grant (100 per day at the 5 FLOP day cap). If a
   cooperative settle still pays the whole escrow, each ask pays ~500× its catalog cost: the
-  price of keeping the floor.
+  price of keeping the floor. **Owner decision, 23 Nov: keep it** (devnet and testnet), so a
+  failed ack always counts against the miner. Revisit if the first real settle shows the whole
+  escrow is paid and the cost matters.
 
 **FlopPolicy** is the only module that may sign; a test greps the package for signing calls
 anywhere else. Its extrinsic allowlist is currently `ComputeChannel.{expire_force_open, timeout,
