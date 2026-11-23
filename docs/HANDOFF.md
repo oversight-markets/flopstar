@@ -488,7 +488,7 @@ SELECT json_extract(json_extract(raw_json, '$.text'), '$.t') AS t, COUNT(*) FROM
 
 **Security checklist (droplet)**
 - [x] Seed backed up offline before any move (owner, step 0)
-- [x] SSH keys only; `ufw` allows only OpenSSH
+- [x] SSH keys only; `ufw` allows only OpenSSH, 80 and 443 (Caddy); hardened 23 Nov (below)
 - [x] `flopstar` user is non-root; key `0600 flopstar`; creds `0600 root`
 - [x] Passphrase and seed exist only as `.cred` files
 - [x] `flopstar-signer@verify` passes; `sudo -u nobody cat` on the key is refused
@@ -499,6 +499,39 @@ SELECT json_extract(json_extract(raw_json, '$.text'), '$.t') AS t, COUNT(*) FROM
   is root-equivalent on this host. Nothing running as `flopstar` may take commands from model
   output or remote input. No container publishes ports (the CLI uses `--network host` with no
   `-p`), so Docker's iptables rules don't open anything past `ufw`. Undo: `gpasswd -d flopstar docker`.
+
+**Host hardening (23 Nov 2026)**
+
+The audit found the basics in place. SSH takes keys only, and `root` has one authorized key (RSA
+4096); every login in the previous 60 days used it. `ufw` denies incoming except 22, 80 and 443 (Caddy).
+Docker publishes no ports, AppArmor is on, the root password is locked, and unattended-upgrades
+applies security updates daily. These changes were made:
+
+- **Packages:** all 56 pending updates installed, including Caddy 2.11.4 → 2.11.9. Kernel
+  6.8.0-151 is installed but **only takes effect on reboot**; reboot while no flopstar service is
+  running. The update ran with `NEEDRESTART_MODE=l`, so no service was restarted by it.
+- **SSH:** `/etc/ssh/sshd_config.d/01-hardening.conf` (named `01-` so it is read before
+  `50-cloud-init.conf`; sshd keeps the first value it reads). Sets `PermitRootLogin prohibit-password`,
+  turns off password and keyboard-interactive auth, `X11Forwarding no`, `AllowAgentForwarding no`,
+  `MaxAuthTries 6`, `MaxSessions 4`, `LoginGraceTime 30`, `ClientAliveInterval 300` with
+  `ClientAliveCountMax 3`. TCP forwarding stays on for tunnels. The pre-change config is backed up in
+  `/root/ssh-backup-20261123`. SSH is **not** restricted by source IP, because the owner's address changes
+  (mobile and VPN). After any sshd edit, run `sshd -t && systemctl reload ssh` and test a new
+  login from a second terminal before closing the first.
+- **Kernel/network:** `/etc/sysctl.d/60-hardening.conf` blocks ICMP redirects (sent and
+  accepted), logs martian packets, and sets `tcp_rfc1337`, `kptr_restrict = 2`, and
+  `protected_fifos`/`protected_regular = 2`. It's safe with `ip_forward = 1`, which Docker needs.
+
+Open follow-ups, in priority order:
+- [ ] Sandbox the flopstar units. `systemd-analyze security` scores all seven at 8.3 (EXPOSED).
+  Start with `NoNewPrivileges`, `ProtectSystem=strict` plus `ReadWritePaths=/var/lib/flopstar`,
+  `ProtectHome`, `PrivateTmp`, and `CapabilityBoundingSet=`. Test against `flopstar-signer@verify`
+  before any signing step.
+- [ ] The `flopstar` user in the `docker` group (above) is still root-equivalent. Fixing it means
+  changing how `flopstar-flop-run` calls Docker, for example rootless Docker or a narrow root helper.
+- [ ] Ubuntu Pro (free for up to 5 machines): `pro attach <token>` enables Livepatch (kernel fixes without
+  reboot) and ESM security updates.
+- [ ] Optional: replace the RSA key with ed25519. Add the new key, test it, then remove the old one.
 
 ---
 
