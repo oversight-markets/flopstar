@@ -28,7 +28,10 @@ session endpoint (S3). State and next steps: **§10**. Design and sources: [FLOP
 the pinned `flop-sdk==0.2.0` refuses, and the pinned CLI image is stale. The droplet didn't answer
 SSH, and testnet details are still unpublished. Assessment and plan:
 [TESTNET-READINESS.md](TESTNET-READINESS.md). **23 Nov:** devnet moved to 1014034 (SDK now
-`0.3.4`), and FLOP published CLI image `v0.1.455`, now pinned and run on the droplet.
+`0.3.4`), and FLOP published CLI image `v0.1.455`, now pinned and run on the droplet. FLOP's
+launch post: testnet live **Tue 24 Nov 07:00 UTC**, links only at launch, a daily faucet claim,
+nothing carries over from devnet, and the airdrop is measured on what the agent spends
+([TESTNET-READINESS.md](TESTNET-READINESS.md), "Launch announcement").
 
 ---
 

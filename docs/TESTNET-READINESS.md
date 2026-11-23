@@ -19,6 +19,46 @@ No flopstar services or timers are loaded, and `KILL-flop` is absent. Devnet had
 to runtime **1014034**, which 0.3.3 refuses, so the SDK now pins 0.3.4 (blocker 1). FLOP also
 published a newer CLI image overnight; it is now pinned and run on the droplet (blocker 2).
 
+## Launch announcement (FLOP Labs, 23 Nov)
+
+FLOP Labs' last post before launch, as the owner relayed it (verbatim):
+
+> Flop Network testnet goes live tomorrow, Tuesday Nov 24, at 07:00 UTC.
+>
+> Got an agent? There's no approval and no waitlist. It claims testnet $ FLOP from the faucet every
+> day, in Technocore chat or with one API call. Spend it on inference. The airdrop is measured on
+> what your agent does on testnet, so a wallet full of unspent faucet tokens gets you nowhere.
+>
+> Miners and validators are sponsored. You don't need to hold any $ FLOP to join, so that excuse is
+> gone. If you were on Devnet, nothing carries over and you have to rejoin.
+>
+> Expect a queue on day one. Miners calibrate in turn and validator seats open in daily batches,
+> which is why validators get a 14 day grace period. The ranking for mainnet only starts counting
+> once those two weeks are over, so joining on day 3 costs you nothing.
+>
+> KOLs, we haven't forgotten you, and your program switches on at mainnet.
+>
+> No links today. Setup pages and the Explorer go out at launch.
+
+What it means for Flopstar:
+
+- **Timing:** live **Tue 24 Nov 07:00 UTC**. Genesis, RPC, faucet and explorer URLs only appear
+  then ("no links today"), so blocker 4 can't be cleared before launch. Pin them from the
+  published setup pages, not from guesses.
+- **Admission:** "no approval and no waitlist" for agents answers part of S2 (admission policy).
+- **Faucet:** a daily claim, "in Technocore chat or with one API call". Our cap
+  `faucet_draws_per_day = 1` already matches. Flopstar draws through the API, never through
+  Technocore chat. Treat the chain balance as the truth, as on devnet.
+- **Spending is what counts:** the airdrop is measured on what the agent does, not what it holds.
+  So the launch-day fallback below ("park again" with a funded wallet) is safe but earns nothing.
+  The aim is real asks within the caps once a route opens.
+- **Nothing carries over from devnet:** the spend account needs a fresh testnet faucet draw.
+  Whether Touchstone's registration (agent 113) needs redoing for testnet is unknown; check at
+  launch.
+- **Day-one queue:** miners calibrate in turn, so a usable miner endpoint (blocker 5) may lag by a
+  day or more. The ranking only starts after the 14-day validator grace period, so a slow start
+  costs nothing.
+
 ## Blocking issues
 
 ### 1. ~~The pinned FLOP SDK is too old for the chain~~ Done again for runtime 1014034
@@ -196,7 +236,8 @@ Even with everything else fixed, the agent can't buy inference until one of thes
    (FLOP.md §12)?
 7. ~~Deploy to `/opt/flopstar` (HANDOFF §7) and re-run `flop status` there.~~ `d475e64` deployed
    23 Nov (venv synced). Its status failed on runtime 1014034, which led to the 0.3.4 bump;
-   redeploy the bump and re-run status. Repeat after every SDK or CLI re-pin.
+   redeploy the bump and re-run status. Repeat after every SDK or CLI re-pin. **23 Nov:** 0.3.4
+   and CLI v0.1.455 deployed (`63125b4`), and status is healthy against devnet 1014034.
 
 ### On launch day
 
@@ -204,7 +245,9 @@ Follow the go-live sequence at the end of [FLOP.md §12](FLOP.md): dry run first
 each `--post` run by the owner.
 
 If testnet launches without published miner endpoints or a gateway key route, the realistic goal
-for launch day is: chain status healthy, a faucet draw done, and the agent parked again.
+for launch day is: chain status healthy, a faucet draw done, and the agent parked again. Per the
+launch announcement, a funded but idle wallet earns nothing toward the airdrop, so take up the
+first route that opens. With the 14-day grace period, a few days' delay costs nothing.
 
 ## Sources checked
 
