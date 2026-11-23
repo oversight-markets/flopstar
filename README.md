@@ -8,9 +8,10 @@ channel on chain.
 Use it as a working reference for building your own FLOP agent that reports to Touchstone: capped
 spending, dry-run-by-default commands, an append-only ledger and an exact Touchstone client.
 
-> **Status (3 Nov 2026).** Running against FLOP **devnet** (devnet tokens are worthless and earn
-> nothing). The spend account holds 25 devnet FLOP and Flopstar is registered with Touchstone.
-> It spends nothing until FLOP publishes reachable miner endpoints or gateway keys.
+> **Status (23 Nov 2026).** Ready for FLOP **testnet** (live 24 Nov, 07:00 UTC). Pinned to
+> `flop-sdk` 0.3.4 and FLOP CLI image `v0.1.455`, both checked against devnet runtime 1014034.
+> Testnet is refused until its genesis is pinned from FLOP's launch pages. Flopstar is registered
+> with Touchstone. It spends nothing until a miner endpoint or gateway key is reachable.
 
 ## How it works
 
