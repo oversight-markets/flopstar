@@ -48,9 +48,27 @@ def test_example_config_loads_with_starting_caps():
     assert cfg.kill_path.name == "KILL-flop"
 
 
-def test_testnet_is_selectable_by_env_and_refuses_until_genesis_pinned():
+TESTNET_GENESIS = "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800"
+
+
+def test_testnet_is_selectable_by_env_and_pinned_to_the_launch_genesis():
     cfg = load_config(EXAMPLE, env={"FLOPSTAR_FLOP_NETWORK": "testnet"})
     assert cfg.network.name == "testnet"
+    cfg.require_pinned_genesis()
+    cfg.check_genesis(TESTNET_GENESIS)
+    with pytest.raises(GenesisMismatch):
+        cfg.check_genesis(DEVNET_GENESIS)
+    assert cfg.network.min_escrow == 5 * 10**16
+
+
+def test_a_network_without_genesis_refuses(monkeypatch):
+    import dataclasses
+
+    import flopstar.flop.config as config_mod
+
+    unpinned = dataclasses.replace(BUILTIN_PROFILES["testnet"], genesis_hash=None)
+    monkeypatch.setitem(config_mod.BUILTIN_PROFILES, "testnet", unpinned)
+    cfg = load_config(EXAMPLE, env={"FLOPSTAR_FLOP_NETWORK": "testnet"})
     with pytest.raises(ConfigError, match="no pinned genesis"):
         cfg.require_pinned_genesis()
     with pytest.raises(ConfigError):

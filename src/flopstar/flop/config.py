@@ -74,22 +74,24 @@ BUILTIN_PROFILES = {
         # spec 1014031 on 2026-11-22 and spec 1014034 on 2026-11-23.
         min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
     ),
-    # Status "planned", genesis policy "pin-before-live"; none of these hosts resolve yet.
+    # Live 24 Nov 2026 07:00 UTC. FLOP's testnet page (flop.network/testnet) publishes the wss RPC
+    # and this genesis; checked on 24 Nov against chain_getBlockHash(0) on both the wss and the
+    # HTTPS endpoint (specName flop-testnet, spec 1014035). The faucet and gateway hosts below are
+    # still unpublished guesses that don't resolve.
     "testnet": NetworkProfile(
         name="testnet",
         rpc_url="wss://testnet.flop.network",
-        # SPEC(S2): FLOP publishes only the wss URL; HTTPS JSON-RPC on the same host is unconfirmed.
-        rpc_http_url=None,
+        rpc_http_url="https://testnet.flop.network",  # answers JSON-RPC POSTs (24 Nov)
         faucet_url="https://faucet.testnet.flop.network",
         gateway_url="https://gateway.testnet.flop.network/v1",
         # SPEC(S3): no testnet offer indexer is named anywhere.
         indexer_url=None,
         mcp_url=None,
-        # SPEC(S2): pin before use; refuse to run until set in the config file.
-        genesis_hash=None,
+        genesis_hash="0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
         cli_npm_version="0.8.0",
         cli_image=None,  # SPEC(S5): which CLI build FLOP supports on testnet
-        min_escrow=None,  # read it from the testnet runtime once live
+        # Read from the testnet runtime (spec 1014035) on 2026-11-24.
+        min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
     ),
 }
 

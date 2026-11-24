@@ -171,7 +171,13 @@ def test_faucet_cap(tmp_path, monkeypatch):
     policy.authorize_faucet(MINER)
 
 
-def test_testnet_without_genesis_refuses(tmp_path, monkeypatch):
+def test_network_without_genesis_refuses(tmp_path, monkeypatch):
+    import dataclasses
+
+    import flopstar.flop.config as config_mod
+
+    unpinned = dataclasses.replace(config_mod.BUILTIN_PROFILES["testnet"], genesis_hash=None)
+    monkeypatch.setitem(config_mod.BUILTIN_PROFILES, "testnet", unpinned)
     _, _, policy, _ = make(tmp_path, monkeypatch, text=config_text("testnet"))
     with pytest.raises(ConfigError, match="no pinned genesis"):
         ask(policy)

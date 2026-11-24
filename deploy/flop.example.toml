@@ -26,9 +26,8 @@ allowed_models = ["qwen/qwen2.5-0.5b-instruct"]
 same_control_miners = []   # SS58 addresses of miners Oversight controls; never buy from them
 
 [testnet]
-# Testnet refuses to run until its genesis is pinned (FLOP: "pin-before-live", docs/FLOP.md S2).
-# genesis_hash = "0x..."
-# rpc_http_url = "https://..."
+# Genesis, RPC URLs and min_escrow (0.05 FLOP at spec 1014035) are pinned in the built-in profile
+# from FLOP's launch page and the live chain (24 Nov 2026). Override only to follow a reset.
 # min_escrow = "..."   # read from the testnet runtime; without it no request can be sized
 
 [testnet.caps]
