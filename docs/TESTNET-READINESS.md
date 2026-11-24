@@ -38,6 +38,10 @@ early release. We'll be activating features over the coming hours." Read-only ch
 **17:15 UTC: both RPC endpoints (https and wss) answer 429 "Too many connections"**, so `flop status` on
 0.3.5 hasn't been confirmed against the chain yet.
 
+**18:44 UTC recheck: unchanged.** RPC still 429; `releases.json` still v0.1.455; PyPI 0.3.5, npm sdk
+0.10.0 / cli 0.8.2; `faucet.flop.network` still devnet. `flop.network/testnet` now redirects to
+`flop.finance/testnet/`, with the same text and no faucet, gateway or miner links.
+
 **Next, as FLOP turns features on:** (1) ~~re-pin flop-sdk~~ (0.3.5, done) and the CLI image once `releases.json` names a release accepting
 1014035, using the re-pin check from blocker 2; (2) pin the faucet URL once it's published, then
 run `wallet setup` and `faucet`, each dry run first and then `--post` by the owner; (3) set
