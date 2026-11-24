@@ -42,6 +42,13 @@ early release. We'll be activating features over the coming hours." Read-only ch
 0.10.0 / cli 0.8.2; `faucet.flop.network` still devnet. `flop.network/testnet` now redirects to
 `flop.finance/testnet/`, with the same text and no faucet, gateway or miner links.
 
+**21:43 UTC recheck: unchanged.** RPC still 429; `releases.json` still v0.1.455 (GHCR now up to
+v0.1.470); PyPI 0.3.5, npm sdk 0.10.0 / cli 0.8.2; `faucet.flop.network` still devnet and
+`faucet.testnet`/`gateway.testnet`/`rpc.testnet.flop.network` don't resolve. FLOPScan's page loads
+but its API (`/api/stats`, `/api/blocks`) returns 503 "Era-T reader unavailable". The testnet page
+now says six founding validators produce and finalize blocks, the first 50 validator seats are
+open, and history and balances may be reset.
+
 **Next, as FLOP turns features on:** (1) ~~re-pin flop-sdk~~ (0.3.5, done) and the CLI image once `releases.json` names a release accepting
 1014035, using the re-pin check from blocker 2; (2) pin the faucet URL once it's published, then
 run `wallet setup` and `faucet`, each dry run first and then `--post` by the owner; (3) set
