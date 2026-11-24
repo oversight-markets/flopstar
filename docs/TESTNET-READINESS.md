@@ -28,14 +28,17 @@ early release. We'll be activating features over the coming hours." Read-only ch
 |---|---|
 | RPC | `wss://testnet.flop.network/` published; `https://testnet.flop.network` also answers JSON-RPC. 6 peers, not syncing. |
 | Genesis | `0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800`: the page and `chain_getBlockHash(0)` agree. **Pinned** in `flop/config.py`. |
-| Runtime | `flop-testnet` spec **1014035**. flop-sdk 0.3.4 stops at 1014034, so `flop status` fails with `Unsupported runtime spec version 1014035`. No newer flop-sdk (PyPI) or `@flop-labs/sdk` (npm, 0.9.0) yet. `@flop-labs/cli` 0.8.1 (24 Nov 01:30) still bundles sdk ^0.9.0. `releases.json` still names CLI v0.1.455. |
+| Runtime | `flop-testnet` spec **1014035**. **17:15 UTC: `flop-sdk` 0.3.5 (PyPI, 24 Nov 15:50) admits 1014035; pinned.** Its diff from 0.3.4 is the version string, the list entry and a comment: testnet runs the flop-testnet build of 1014035 (61 pallets: devnet's minus PaidStorage and the voucher pallets 150–155, none of which Flopstar uses). npm now has `@flop-labs/sdk` 0.10.0 and `@flop-labs/cli` 0.8.2 (both ~15:50), and GHCR has CLI images up to v0.1.470, but `releases.json` still names v0.1.455 (bundles sdk 0.9.0, which refuses 1014035), so the CLI is not re-pinned yet. |
 | `min_escrow` | 0.05 FLOP (`ComputeChannel.MinForceOpenEscrowForFailedAck`, read via substrate-interface). Pinned. |
 | Faucet | Not published. `faucet.flop.network` still serves **devnet**; `faucet.testnet.flop.network` doesn't resolve. |
 | Gateway, miners, offer indexer | Not published (S3/S4 unchanged). |
 | Explorer | `https://testnet.flopscan.io/` (FLOPScan). |
 | Scoring | The opening is "unscored"; agents are credited for "compute purchased in settled sessions" in the later scored phase. Two rules affect us: wallets under common control count as one participant, and spend routed to a miner under common control isn't credited (our `same_control_miners` blocklist). |
 
-**Next, as FLOP turns features on:** (1) re-pin flop-sdk and the CLI image once a release accepts
+**17:15 UTC: both RPC endpoints (https and wss) answer 429 "Too many connections"**, so `flop status` on
+0.3.5 hasn't been confirmed against the chain yet.
+
+**Next, as FLOP turns features on:** (1) ~~re-pin flop-sdk~~ (0.3.5, done) and the CLI image once `releases.json` names a release accepting
 1014035, using the re-pin check from blocker 2; (2) pin the faucet URL once it's published, then
 run `wallet setup` and `faucet`, each dry run first and then `--post` by the owner; (3) set
 `allowed_models` and `[testnet.miners]` once a route exists.

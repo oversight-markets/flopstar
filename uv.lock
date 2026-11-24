@@ -737,7 +737,7 @@ wheels = [
 
 [[package]]
 name = "flop-sdk"
-version = "0.3.4"
+version = "0.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -746,9 +746,9 @@ dependencies = [
     { name = "substrate-interface" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/5d/ad1268b0a102086b723202fe0571ed94729a65ef02cf6cd18d1f92c83d67/flop_sdk-0.3.4.tar.gz", hash = "sha256:c7d136d34593ed1118bc6d86109fe12decf0ab0059cd8d6f3e3cb59f4d84302e", size = 231779, upload-time = "2026-11-23T05:51:48.242Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/a1/046eb577383046e56428b2419d313145a945e95bb297f65fe1346cb6587f/flop_sdk-0.3.5.tar.gz", hash = "sha256:93c88661f14239a756957f7d052a0fd8e86613f62caac4dfa0208c38c0a39ac4", size = 231977, upload-time = "2026-11-24T15:50:48.895Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/92/09a27476dce543d8b9123d84218d66562ae1da6c41968c779b46757b2df0/flop_sdk-0.3.4-py3-none-any.whl", hash = "sha256:56b0f6403741b6f8761475168824f0a224f03c6c90c6bf57c5392b3c73ced718", size = 58939, upload-time = "2026-11-23T05:51:47.15Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/b9/6b1ee9c4ebf25e2e56a9a31aa0e45ac770cfeb06a80ceb839bd1d0a8c805/flop_sdk-0.3.5-py3-none-any.whl", hash = "sha256:118479b2ef5483bd53fe44c4bcffb48ff32243906578df14a4337512898f4e5d", size = 59129, upload-time = "2026-11-24T15:50:47.932Z" },
 ]
 
 [[package]]
@@ -779,7 +779,7 @@ dev = [
 requires-dist = [
     { name = "base58", specifier = ">=2.1.1" },
     { name = "cryptography", specifier = ">=42.0.0" },
-    { name = "flop-sdk", specifier = "==0.3.4" },
+    { name = "flop-sdk", specifier = "==0.3.5" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
