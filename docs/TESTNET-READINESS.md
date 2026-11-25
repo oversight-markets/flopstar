@@ -54,6 +54,54 @@ open, and history and balances may be reset.
 run `wallet setup` and `faucet`, each dry run first and then `--post` by the owner; (3) set
 `allowed_models` and `[testnet.miners]` once a route exists.
 
+## Day 2 update (FLOP Labs, 25 Nov)
+
+FLOP Labs' day-2 status post, as the owner relayed it (verbatim):
+
+> Flop Network testnet, day 2.
+>
+> Up
+> - Six founding validators finalize about one block per second
+> - Public endpoint and bootnodes are up
+> - Validator registration is open for the first 50 seats. Target after that: 25% daily growth
+> - Testnet docs and validator prep kit: http://docs.flop.network
+> - Devnet stays up. Keep what you run there online
+>
+> Down
+> - FLOPScan is unreliable while we fix it. If it looks stuck, use the public endpoint
+>
+> Next
+> - Signed validator kit and testnet miner pack. New validators and miners join after that
+> - Testnet faucet, not live yet
+> - Routing changes
+> - Voucher earning, then trading
+>
+> Nothing is scored yet. Validators have a two-week grace period. Miner and agent work counts from
+> the voucher start block, to be announced. Nothing carries over from Devnet. Test $ FLOP has no
+> value.
+
+What it means for Flopstar (not re-probed; from the post alone):
+
+- **Still blocked on FLOP, now confirmed by FLOP:** no testnet faucet yet, and no testnet miners
+  until the "testnet miner pack" ships (blocker 5). The order in "Next" puts the miner pack first,
+  then the faucet, routing changes, and voucher earning. So no testnet ask is possible yet, and
+  the go-live steps after `flop status` stay parked.
+- **Scoring clock changed:** agent work counts from a **voucher start block, to be announced**,
+  not from the end of the 14-day grace period (that grace is now stated for validators only).
+  Nothing done before that block counts, so waiting costs nothing. Watch for the block number.
+- **Vouchers:** "voucher earning, then trading" matches the voucher pallets (150–155) that the
+  flop-testnet 1014035 build omits (see "Launch day", Runtime). Expect a runtime upgrade that adds
+  them, which means another `flop-sdk` (and CLI) re-pin before Flopstar works again.
+- **"Routing changes"** may change how asks reach miners (gateway vs. direct session). Re-check
+  `[testnet.miners]`/`allowed_models` and the session-run path when they land.
+- **FLOPScan:** consistent with the 503 "Era-T reader unavailable" seen at 21:43 UTC on 24 Nov.
+  Use the public RPC endpoint for chain reads, as FLOP says; Flopstar already does.
+- **Devnet stays up**, and FLOP asks people to keep what they run there online. Flopstar runs
+  nothing long-lived on devnet (the spend account is idle and the services are stopped), so
+  nothing to keep up. Devnet still counts for nothing ("nothing carries over").
+- **Docs:** testnet docs and the validator prep kit are at `docs.flop.network`. Read them for the
+  faucet URL and miner/routing details once those features go live.
+
 ## Launch announcement (FLOP Labs, 23 Nov)
 
 FLOP Labs' last post before launch, as the owner relayed it (verbatim):
