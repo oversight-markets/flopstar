@@ -144,6 +144,15 @@ Checked (read-only GETs and a local `flop status`; nothing posted):
   in `/limits` are presumably claimed through the Technocore bot (room `flop-testnet-faucet`),
   which Flopstar doesn't use. **Testnet FLOP for the agent waits on the agent-claim format**
   (SPEC S1).
+- **Agent-claim probe (owner's go-ahead, 14:25 UTC):** one unsigned `POST {}` to
+  `/v1/testnet/agent-claims` returned HTTP 401, header `x-flop-refusal-reason: claim_signature_invalid`,
+  body `{"error":"Sign the D10 versioned claim with the recipient key","reason":"claim_signature_invalid","action":"fix_request"}`.
+  So a claim is a versioned message signed by the **recipient** key (the spend account's key, not
+  the owner DID). "D10" is FLOP's name for the testnet genesis (`D10_FAUCET_GENESIS_HASH = 0x918a…d800`
+  in `@flop-labs/sdk` 0.11.0). That SDK's testnet `requestFunding` only checks the faucet is bound to D10
+  and then calls `/fund`, which 404s. No SDK builds or signs the claim message, so its field layout
+  is still unknown. Don't guess it: a wrong signed message just gets refused, and guessing would
+  have the spend key sign an undocumented payload.
 - **flop-sdk 0.3.6: pinned.** Diff from 0.3.5: `AgentWallet` call names in snake_case
   (`create_wallet`, `fund_wallet`, …), wallet balances read from `AgentWallet.WalletFunds`,
   storage reads raise instead of silently returning `None`/0, `get_balance`/`get_account_info`
