@@ -135,10 +135,15 @@ Checked (read-only GETs and a local `flop status`; nothing posted):
 - **Agent claims aren't implemented yet.** The request format isn't published (`GET` on the claim
   path is 404, and the docs pages are JS-rendered). Neither `flop-sdk` 0.3.6 nor npm
   `@flop-labs/sdk` 0.11.0 mentions `agent-claims`. That matches "Next: agent faucet claims".
-  Flopstar's `faucet` uses the anonymous `POST /fund` route (SPEC S1 anticipated a DID-signed
-  agent route). Since the airdrop counts what the agent *does*, the agent route is probably the
-  one that counts once it ships. Re-check then; the 25 FLOP anonymous grant is enough to fund
-  asks before that.
+  **Correction (14:20 UTC):** the testnet faucet has **no `POST /fund`**. Draw 5 (owner-run,
+  `flopstar-flop-faucet`) got HTTP 404 with an empty body; nothing was granted, the ledger records
+  it as failed, and `KILL-flop` wasn't tripped. The host serves only `/`, `/chain`, `/health`,
+  `/limits` and the agent-claim path. It has no web page and no `assets/faucet.js`; devnet's
+  `faucet.js` uses `/fund`, `/chain`, `/health` and `/transactions/`. So Flopstar's `faucet`
+  command (anonymous `/fund`) can't draw on testnet. The 25 FLOP anonymous and the linked grants
+  in `/limits` are presumably claimed through the Technocore bot (room `flop-testnet-faucet`),
+  which Flopstar doesn't use. **Testnet FLOP for the agent waits on the agent-claim format**
+  (SPEC S1).
 - **flop-sdk 0.3.6: pinned.** Diff from 0.3.5: `AgentWallet` call names in snake_case
   (`create_wallet`, `fund_wallet`, …), wallet balances read from `AgentWallet.WalletFunds`,
   storage reads raise instead of silently returning `None`/0, `get_balance`/`get_account_info`
@@ -154,10 +159,9 @@ Checked (read-only GETs and a local `flop status`; nothing posted):
   "First Testnet inference" is FLOP's next step, so expect a `releases.json` bump; re-pin with the
   blocker-2 check when it lands.
 
-Next for Flopstar: deploy this commit to `/opt/flopstar` and re-run `flop status` there. When the
-owner chooses, set up the testnet spend wallet and take the anonymous draw (`flop wallet setup`,
-then `flop faucet`, dry run first, `--post` by the owner). Then wait for the agent-claim format,
-a CLI release for 1014035, and a miner route.
+Next for Flopstar: deployed (`adeda32`), and `/etc/flopstar/flop.toml` switched to testnet (status
+healthy). Wait for the agent-claim request format, add it to `flop/faucet.py` behind FlopPolicy, and
+draw through it. Also wait for a CLI release for 1014035 and a miner route.
 
 ## Launch announcement (FLOP Labs, 23 Nov)
 
