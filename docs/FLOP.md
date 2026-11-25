@@ -102,8 +102,8 @@ keeps amounts as `int` base units and `Decimal`, and never passes floats to the 
 
 | | RPC | Gateway | Faucet | Status | Genesis policy |
 |---|---|---|---|---|---|
-| devnet | `wss://rpc.devnet.flop.network` | `https://api.flop.network` | `https://faucet.flop.network` | live | compare-services |
-| testnet | `wss://testnet.flop.network` | `https://gateway.testnet.flop.network` | `https://faucet.testnet.flop.network` | **planned** | **pin-before-live** |
+| devnet | `wss://rpc.devnet.flop.network` | `https://api.flop.network` | `https://faucet.devnet.flop.network` (moved 25 Nov) | live | compare-services |
+| testnet | `wss://testnet.flop.network` | `https://gateway.testnet.flop.network` (unpublished) | `https://faucet.flop.network` (since 25 Nov) | live since 24 Nov | **pin-before-live** (pinned) |
 
 FLOP is "a stock Substrate chain: `MultiSignature` (sr25519 + ed25519 + ecdsa) over `AccountId32`,
 SS58 prefix 42" with 18 decimals (`sdk:chain.js:1-14`).

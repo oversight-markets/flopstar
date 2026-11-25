@@ -60,7 +60,7 @@ BUILTIN_PROFILES = {
         name="devnet",
         rpc_url="wss://rpc.devnet.flop.network",
         rpc_http_url="https://rpc.devnet.flop.network",
-        faucet_url="https://faucet.flop.network",
+        faucet_url="https://faucet.devnet.flop.network",  # moved here 25 Nov (FLOP post)
         gateway_url="https://api.flop.network/v1",
         indexer_url="https://explorer.devnet.flop.network",
         mcp_url="https://mcp.flop.network/mcp",
@@ -76,13 +76,14 @@ BUILTIN_PROFILES = {
     ),
     # Live 24 Nov 2026 07:00 UTC. FLOP's testnet page (flop.network/testnet) publishes the wss RPC
     # and this genesis; checked on 24 Nov against chain_getBlockHash(0) on both the wss and the
-    # HTTPS endpoint (specName flop-testnet, spec 1014035). The faucet and gateway hosts below are
-    # still unpublished guesses that don't resolve.
+    # HTTPS endpoint (specName flop-testnet, spec 1014035). The faucet took over
+    # faucet.flop.network on 25 Nov (its /chain reports this genesis); the gateway host below is
+    # still an unpublished guess that doesn't resolve.
     "testnet": NetworkProfile(
         name="testnet",
         rpc_url="wss://testnet.flop.network",
         rpc_http_url="https://testnet.flop.network",  # answers JSON-RPC POSTs (24 Nov)
-        faucet_url="https://faucet.testnet.flop.network",
+        faucet_url="https://faucet.flop.network",
         gateway_url="https://gateway.testnet.flop.network/v1",
         # SPEC(S3): no testnet offer indexer is named anywhere.
         indexer_url=None,

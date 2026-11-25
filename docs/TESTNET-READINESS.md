@@ -50,8 +50,8 @@ now says six founding validators produce and finalize blocks, the first 50 valid
 open, and history and balances may be reset.
 
 **Next, as FLOP turns features on:** (1) ~~re-pin flop-sdk~~ (0.3.5, done) and the CLI image once `releases.json` names a release accepting
-1014035, using the re-pin check from blocker 2; (2) pin the faucet URL once it's published, then
-run `wallet setup` and `faucet`, each dry run first and then `--post` by the owner; (3) set
+1014035, using the re-pin check from blocker 2; (2) ~~pin the faucet URL once it's published~~ (25 Nov: `faucet.flop.network`, see "Day 2, second
+update"), then run `wallet setup` and `faucet`, each dry run first and then `--post` by the owner; (3) set
 `allowed_models` and `[testnet.miners]` once a route exists.
 
 ## Day 2 update (FLOP Labs, 25 Nov)
@@ -101,6 +101,63 @@ What it means for Flopstar (not re-probed; from the post alone):
   nothing to keep up. Devnet still counts for nothing ("nothing carries over").
 - **Docs:** testnet docs and the validator prep kit are at `docs.flop.network`. Read them for the
   faucet URL and miner/routing details once those features go live.
+
+## Day 2, second update (FLOP Labs, 25 Nov; checked 14:15 UTC)
+
+FLOP Labs' post, as the owner relayed it (verbatim):
+
+> What changed since opening:
+>
+> - Public RPC no longer drops connections under load
+> - Testnet faucet is up at http://faucet.flop.network (Devnet moved to http://faucet.devnet.flop.network)
+> - flop-sdk 0.3.6 on PyPI fixes agent wallet calls on Testnet
+> - Docs corrected: SDK version, miner capacity bond, network status
+>
+> Next: agent faucet claims and the first Testnet inference. Thanks to everyone who filed reports.
+> Keep them coming.
+
+Checked (read-only GETs and a local `flop status`; nothing posted):
+
+- **Faucet hosts swapped.** `https://faucet.flop.network/chain` now reports `network: testnet` and
+  genesis `0x918a…d800` (matches the pin); `https://faucet.devnet.flop.network/chain` reports
+  devnet `0x99c1…d631`. Both also answer over HTTPS, so Flopstar keeps HTTPS. Until this commit
+  the **devnet profile pointed at what is now the testnet faucet.** A devnet draw would have
+  failed the `/chain` genesis check and tripped `KILL-flop`. Nothing draws on a timer, so this
+  never happened. Both profiles are now updated in `flop/config.py`, and
+  `/etc/flopstar/flop.toml` sets no `faucet_url` override.
+- **Testnet faucet rules** (`/limits`): **anonymous** grant 25 FLOP, 1 per address per 24 h, and
+  3 grants per IP per day (devnet allows 300). **Linked** (verified human) 500–2,000 FLOP. **Agent**
+  grant 10 FLOP at `POST /v1/testnet/agent-claims`, 10 FLOP rolling 24 h cap, `rolloverRequiresSpend:
+  true`. 3,820 grants were pending at 14:15 UTC, so expect a delay like devnet draw #4. `/health`
+  shows faucet image 0.1.484, and its `technocoreBot` names DID
+  `did:key:z6MktjwdcBkwC6xo9wi4KY4ckWvn1GQHdQ1qzkaZtWqHAoxs` in room `flop-testnet-faucet` (the
+  chat route; Flopstar doesn't use it).
+- **Agent claims aren't implemented yet.** The request format isn't published (`GET` on the claim
+  path is 404, and the docs pages are JS-rendered). Neither `flop-sdk` 0.3.6 nor npm
+  `@flop-labs/sdk` 0.11.0 mentions `agent-claims`. That matches "Next: agent faucet claims".
+  Flopstar's `faucet` uses the anonymous `POST /fund` route (SPEC S1 anticipated a DID-signed
+  agent route). Since the airdrop counts what the agent *does*, the agent route is probably the
+  one that counts once it ships. Re-check then; the 25 FLOP anonymous grant is enough to fund
+  asks before that.
+- **flop-sdk 0.3.6: pinned.** Diff from 0.3.5: `AgentWallet` call names in snake_case
+  (`create_wallet`, `fund_wallet`, …), wallet balances read from `AgentWallet.WalletFunds`,
+  storage reads raise instead of silently returning `None`/0, `get_balance`/`get_account_info`
+  decode `System.Account` via `state_getStorage`, and RPCs that nodes don't expose now raise
+  `RPC_METHOD_UNAVAILABLE`. Flopstar uses only `FlopClient.health()` and
+  `assert_supported_runtime`, both unchanged; the supported range still ends at 1014035. 261
+  tests pass; ruff clean.
+- **RPC fixed:** local `flop status` on 0.3.6 against testnet now succeeds: genesis matches, spec
+  1014035, 18 peers, finalized block 91,020. It returned 429 on 24 Nov, so this is the first
+  confirmed testnet status. Devnet is healthy too (spec 1014034).
+- **CLI still blocks asks:** `releases.json` still names v0.1.455 (bundles sdk 0.9.0, which refuses
+  1014035). npm now has `@flop-labs/sdk` 0.11.0 and `@flop-labs/cli` 0.8.3 (25 Nov ~05:30 UTC).
+  "First Testnet inference" is FLOP's next step, so expect a `releases.json` bump; re-pin with the
+  blocker-2 check when it lands.
+
+Next for Flopstar: deploy this commit to `/opt/flopstar` and re-run `flop status` there. When the
+owner chooses, set up the testnet spend wallet and take the anonymous draw (`flop wallet setup`,
+then `flop faucet`, dry run first, `--post` by the owner). Then wait for the agent-claim format,
+a CLI release for 1014035, and a miner route.
 
 ## Launch announcement (FLOP Labs, 23 Nov)
 
