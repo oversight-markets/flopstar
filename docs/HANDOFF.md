@@ -609,12 +609,13 @@ FLOP="runuser -u flopstar -- env HOME=/var/lib/flopstar FLOPSTAR_DATA_DIR=/var/l
   /opt/flopstar/.venv/bin/flopstar flop"
 $FLOP status                      # chain identity, health, spend balance, budget, kill switch
 $FLOP config                      # resolved profile, caps, paths
-$FLOP faucet                      # dry run; --post draws (needs the owner's go-ahead)
+$FLOP faucet                      # dry run; --post draws (testnet: signed agent claim; owner's go-ahead)
+$FLOP faucet --reconcile ID       # testnet: resend claim ID unchanged after an unknown outcome
 $FLOP recovery                    # channels holding escrow (none yet)
 journalctl -u flopstar-flop-faucet.service          # faucet draw results
 cat /var/lib/flopstar/data/KILL-flop                 # exists only if tripped; holds the reasons
 ```
-Commands that need the spend passphrase (`wallet`/`ask`/`run`/`recovery --post`) run as a unit or
+Commands that need the spend passphrase (`wallet`/`ask`/`run`/`recovery --post`, and the testnet `faucet --post` claim; `flopstar-flop-faucet.service` loads it) run as a unit or
 `systemd-run` with `LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred`
 and `FLOPSTAR_FLOP_PASSPHRASE_FILE=${CREDENTIALS_DIRECTORY}/flop-spend-passphrase` (see
 `deploy/flopstar-flop-run.service`).

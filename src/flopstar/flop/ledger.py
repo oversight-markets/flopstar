@@ -325,6 +325,39 @@ class Ledger:
                  None if amount is None else str(check_raw(amount)), draw_id),
             )
 
+    def note_faucet(self, draw_id: int, detail: dict) -> None:
+        """Record detail (a claim's nonce and signature) on a draw that is still `requested`."""
+        with self.transaction() as c:
+            n = c.execute(
+                "UPDATE flop_faucet_draws SET detail = ? WHERE id = ? AND status = 'requested'",
+                (json.dumps(detail, sort_keys=True), draw_id),
+            ).rowcount
+        if n != 1:
+            raise LedgerError(f"faucet draw {draw_id} is not open")
+
+    def get_faucet(self, draw_id: int):
+        return self.conn.execute("SELECT * FROM flop_faucet_draws WHERE id = ?",
+                                 (draw_id,)).fetchone()
+
+    def last_claim_nonce(self, network: str, address: str) -> int | None:
+        """The highest agent-claim nonce we have ever signed for this address (any status)."""
+        rows = self.conn.execute(
+            "SELECT json_extract(detail, '$.nonce') FROM flop_faucet_draws"
+            " WHERE network = ? AND address = ? AND json_valid(detail)",
+            (network, address),
+        ).fetchall()
+        nonces = [int(r[0]) for r in rows if isinstance(r[0], str) and r[0].isdigit()]
+        return max(nonces) if nonces else None
+
+    def open_claims(self, network: str, address: str) -> list:
+        """Signed claims whose outcome is still unknown (`requested` with a nonce)."""
+        return self.conn.execute(
+            "SELECT * FROM flop_faucet_draws WHERE network = ? AND address = ?"
+            " AND status = 'requested' AND json_valid(detail)"
+            " AND json_extract(detail, '$.nonce') IS NOT NULL ORDER BY id",
+            (network, address),
+        ).fetchall()
+
     def faucet_draws_since(self, network: str, since: datetime) -> int:
         """Draws that may have counted against FLOP's per-identity limit (all but failures)."""
         return self.conn.execute(

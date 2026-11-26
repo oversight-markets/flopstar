@@ -116,6 +116,16 @@ SS58 prefix 42" with 18 decimals (`sdk:chain.js:1-14`).
   **No signature and no identity**: it is keyed by SS58 address only. A non-2xx returns
   `{error}` and may carry `Retry-After`. Default amount 25 FLOP.
 - CLI: `flop --network <net> faucet request <ss58> [--amount N]`.
+- **Testnet has no `/fund`.** Agents claim at `POST {faucet}/v1/testnet/agent-claims` with
+  `{address, nonce, signature}` (npm `@flop-labs/sdk` 0.12.0 `claimTestnetAgentFunds`; CLI 0.9.1
+  `faucet request` signs with `pair.sign(message)`). The recipient key signs the raw UTF-8 text
+  `flop-faucet-agent/v1|<testnet genesis>|<ss58>|<nonce>`; the nonce is a canonical 1–19 digit
+  decimal above the address's previous claim nonce; the signature is `0x` hex. Before signing, the
+  SDK checks the faucet's `/chain` is testnet on the D10 genesis and the CLI checks `/limits`
+  `faucet.status == "open"`. 5xx/408/network errors are an `unknown` outcome: resend the same
+  address, nonce and signature, never a new one. Refusal reasons the CLI names: `nonce_reused`,
+  `transfer_failed` (both: claim again), `claim_signature_invalid`. Grant 10 FLOP per rolling 24 h,
+  `rolloverRequiresSpend: true` (26 Nov).
 
 ### 3.3 Direct sessions: `flop session run` → `runDirectSession` (`cli.js:5519-5583`, `sdk:compute-channel/direct-session.js`)
 
@@ -303,6 +313,9 @@ Alternatives, if FLOP confirms the DID account is what must spend on testnet:
   extrinsic)? Does "inference request signed with that key" mean the DID account signs the escrow
   extrinsic, an HTTP envelope to the gateway, or an `AgentIdentity` registration? Which account
   earns testnet credit: the DID-derived ed25519 account, or whatever spends?
+  **Faucet part answered 26 Nov:** the agent claim is signed by the *recipient* chain key, not the
+  DID (a `|`-joined text, §3.2), so under design A the spend account claims for itself. Which
+  account earns credit is still open.
 - **S2. Testnet endpoints and genesis.** Profiles name them but none resolve; genesis policy is
   "pin-before-live". We need the genesis hash to pin, and confirmation the hostnames are final.
 - **S3. Miner endpoint discovery.** `session run` needs `--endpoint`. Miners publish no endpoint
@@ -537,6 +550,20 @@ checks the 3 × daily cap and then refuses: under design A the owner key funds n
 genesis before drawing, then `POST /fund {address}` for the spend account. Response numbers parse as
 `Decimal`. 4xx/5xx/network failures are recorded as failed draws (they don't use the daily
 allowance and don't trip). A genesis mismatch or a malformed success trips the switch.
+
+**Testnet agent claim** (`faucet --post` when the network is testnet; §3.2). Before the key is
+loaded: no earlier claim may have an unknown outcome, the faucet's `/chain` must report `testnet`
+and our genesis (= the RPC's; a mismatch trips), and `/limits` must show `status: open` and our
+claim path (if not, it refuses without tripping or recording anything). Then `authorize_faucet`
+(caps, ledger row), a nonce (the millisecond clock, kept above every earlier nonce), and
+`FlopPolicy.sign_agent_claim`, the only place the claim is signed. That checks the draw is open,
+on testnet and for this key's address, builds the message itself, verifies the signature against
+the key and logs message and signature to `flop-signatures.log`. The nonce and signature go into
+the draw's ledger row before sending. A 4xx is a failed draw (no trip); a 5xx, 408 or network
+error leaves the row `requested` and prints `faucet --reconcile <id> --post`, which resends the
+stored request byte-for-byte and signs nothing. A malformed 2xx trips the switch and leaves the
+row open. Signature interop: polkadot-js `signatureVerify` (in the pinned CLI image) accepts our
+sr25519 signature over the raw message.
 
 **Inference.** One `plan()` (dry run: local state only) and one `execute()`; `ask` and the task runner
 both use them and refuse up front when `plan` reports problems, so routine budget exhaustion never

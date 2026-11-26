@@ -19,6 +19,8 @@ Dry run unless --post:
   wallet setup [--post]                Create the encrypted spend keystore (key design A)
   wallet fund --amount FLOP [--post]   Owner-funded top-up (refused under key design A)
   faucet [--amount FLOP] [--post]      Draw from the network faucet into the spend account
+                                       (testnet: a signed agent claim; no --amount)
+  faucet --reconcile ID [--post]       Testnet: resend claim ID unchanged after an unknown outcome
   ask --model M --prompt TEXT --purpose NAME [--route direct|gateway] [--miner SS58]
       [--max-flop FLOP] [--max-tokens N] [--post]
                                        Escrow (= the cost) defaults to the estimate from the
@@ -376,6 +378,8 @@ def run_faucet(args: list[str]) -> None:
 
     cfg = _load()
     policy = _policy(cfg)
+    if faucet.is_claim_network(cfg):
+        return _run_claim(cfg, policy, args)
     amount_text = _option(args, "--amount")
     amount = _flop_amount(amount_text) if amount_text else None
     address = spend_address(cfg)
@@ -388,6 +392,55 @@ def run_faucet(args: list[str]) -> None:
         raise SystemExit("refused: " + "; ".join(view["problems"]))
     with HOOKS["http"]() as client:
         outcome = faucet.draw(cfg, policy, HOOKS["chain"](cfg), client, address, amount)
+    _print(outcome)
+    if outcome["status"] != "funded":
+        sys.exit(1)
+
+
+def _run_claim(cfg, policy, args: list[str]) -> None:
+    """Testnet agent claim: the spend key signs; nothing is decrypted or sent without --post."""
+    from ..signer import PolicyViolation
+    from . import faucet
+    from .policy import KillSwitchTripped
+    from .wallet import WalletError, load_spend_keypair, spend_address
+
+    if "--amount" in args:
+        raise SystemExit("testnet agent claims grant a fixed amount; --amount is not accepted")
+    post = "--post" in args
+    reconcile_id = _option(args, "--reconcile")
+    if reconcile_id is not None:
+        if not reconcile_id.isdigit():
+            raise SystemExit("--reconcile needs a faucet draw id")
+        row = policy.ledger.get_faucet(int(reconcile_id))
+        _print({"reconcile": reconcile_id,
+                "draw": dict(row) if row is not None else "no such draw",
+                "sends": "the same address, nonce and signature; nothing is signed"})
+        if not post:
+            print("dry run: nothing sent (add --post)")
+            return
+        try:
+            with HOOKS["http"]() as client:
+                outcome = faucet.reconcile(cfg, policy, HOOKS["chain"](cfg), client,
+                                           int(reconcile_id))
+        except (faucet.ClaimRefused, PolicyViolation, KillSwitchTripped) as e:
+            raise SystemExit(f"refused: {e}") from None
+    else:
+        address = spend_address(cfg)
+        view = faucet.plan_claim(cfg, policy, address, faucet.next_nonce(policy, address or ""))
+        _print(view)
+        if not post:
+            print("dry run: nothing signed or sent (add --post)")
+            return
+        if view["problems"]:
+            raise SystemExit("refused: " + "; ".join(view["problems"]))
+
+        def load():
+            return load_spend_keypair(cfg, HOOKS["passphrase"])
+        try:
+            with HOOKS["http"]() as client:
+                outcome = faucet.claim(cfg, policy, HOOKS["chain"](cfg), client, address, load)
+        except (faucet.ClaimRefused, PolicyViolation, KillSwitchTripped, WalletError) as e:
+            raise SystemExit(f"refused: {e}") from None
     _print(outcome)
     if outcome["status"] != "funded":
         sys.exit(1)

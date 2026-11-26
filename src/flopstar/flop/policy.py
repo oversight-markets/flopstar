@@ -15,6 +15,7 @@ never trip the switch. `authorize_*` methods are the real gate and do trip it.
 """
 
 import json
+import re
 import subprocess
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -38,6 +39,7 @@ class KillSwitchTripped(PolicyViolation):
 
 class ActionKind(StrEnum):
     FAUCET_DRAW = "faucet_draw"
+    FAUCET_CLAIM = "faucet_claim"
     INFERENCE = "inference"
     RECOVERY = "recovery"
     WALLET_FUND = "wallet_fund"
@@ -45,6 +47,24 @@ class ActionKind(StrEnum):
 
 
 RECOVERY_CALLS = ("expire_force_open", "timeout", "finalize")
+
+# Testnet agent claim (npm @flop-labs/sdk 0.12.0 faucet.js `d10AgentClaimMessage`, used by
+# @flop-labs/cli 0.9.1 `faucet request` as `pair.sign(message)`: the raw UTF-8 text, no <Bytes>
+# wrapper). The recipient key signs `flop-faucet-agent/v1|<testnet genesis>|<ss58>|<nonce>`.
+AGENT_CLAIM_PREFIX = "flop-faucet-agent/v1"
+AGENT_CLAIM_NETWORK = "testnet"
+NONCE_RE = re.compile(r"(0|[1-9][0-9]{0,18})")
+
+
+def agent_claim_message(genesis: str, address: str, nonce: str) -> str:
+    """The exact text a testnet agent claim signs. Refuses anything that could break the layout."""
+    if not isinstance(nonce, str) or not NONCE_RE.fullmatch(nonce):
+        raise PolicyViolation(f"claim nonce {nonce!r} is not a canonical decimal of 1-19 digits")
+    if not re.fullmatch(r"0x[0-9a-f]{64}", genesis):
+        raise PolicyViolation(f"claim genesis {genesis!r} is not lowercase 32-byte hex")
+    if not re.fullmatch(r"[1-9A-HJ-NP-Za-km-z]{46,48}", address):
+        raise PolicyViolation(f"claim address {address!r} is not an SS58 address")
+    return f"{AGENT_CLAIM_PREFIX}|{genesis}|{address}|{nonce}"
 
 # Extrinsics FlopPolicy will sign, per action kind. Names checked against the devnet runtime
 # metadata (spec 1014003, docs/FLOP.md §2.4/§6). Kinds without an entry have no extrinsic path yet
@@ -223,6 +243,36 @@ class FlopPolicy:
         self._log({"kind": "authorize", "action": ActionKind.FAUCET_DRAW, "draw_id": draw_id,
                    "address": address})
         return draw_id
+
+    def sign_agent_claim(self, draw_id: int, keypair, nonce: str) -> tuple[str, str]:
+        """
+        Sign one testnet agent claim for an authorized draw with the recipient (spend) key.
+        Returns (message, 0x-hex signature). The draw must be ours, still `requested`, on testnet,
+        for this key's address, and the nonce must be above every earlier claim nonce for it.
+        """
+        kind = ActionKind.FAUCET_CLAIM
+        with self.guarded(f"{kind} signature"):
+            if self.network != AGENT_CLAIM_NETWORK:
+                raise PolicyViolation(f"agent claims exist only on {AGENT_CLAIM_NETWORK}")
+            row = self.ledger.get_faucet(draw_id)
+            if row is None or row["status"] != "requested" or row["network"] != self.network:
+                raise PolicyViolation(f"faucet draw {draw_id} is not an open {self.network} draw")
+            address = row["address"]
+            if keypair.ss58_address != address:
+                raise PolicyViolation(f"spend key {keypair.ss58_address} is not the recipient "
+                                      f"{address}")
+            last = self.ledger.last_claim_nonce(self.network, address)
+            if last is not None and int(nonce) <= last:
+                raise PolicyViolation(f"claim nonce {nonce} is not above the last one ({last})")
+            message = agent_claim_message(self.cfg.require_pinned_genesis().lower(), address,
+                                          nonce)
+            signature = keypair.sign(message.encode())
+            if len(signature) != 64 or not keypair.verify(message.encode(), signature):
+                raise RuntimeError("claim signature does not verify against the spend key")
+            sig_hex = "0x" + signature.hex()
+            self._log({"kind": "signature", "action": kind, "draw_id": draw_id,
+                       "signer": address, "message": message, "signature": sig_hex})
+            return message, sig_hex
 
     # ---- recovery -----------------------------------------------------------------------------
 

@@ -209,9 +209,11 @@ Checked (read-only GETs and `flop status`; nothing signed or posted):
   re-pinned (still v0.1.455, which refuses testnet); do it with the blocker-2 check before the
   first ask.
 
-Next for Flopstar: deploy 0.4.1 to `/opt` and confirm `flop status` there; add the agent claim to
-`flop/faucet.py` behind FlopPolicy (dry run prints the message; the owner runs `--post`); re-pin
-the CLI; raise the testnet caps above `min_escrow` and find a testnet miner and model.
+Next for Flopstar: ~~deploy 0.4.1 to `/opt` and confirm `flop status` there~~ (done, `ccadaed`:
+spec 1014039, spend balance 0); ~~add the agent claim to `flop/faucet.py` behind FlopPolicy~~
+(done: `faucet` on testnet makes the signed claim, `--reconcile ID` resends an unknown one; see
+FLOP.md §12 "Testnet agent claim"; the owner runs `--post` via `flopstar-flop-faucet.service`);
+re-pin the CLI; raise the testnet caps above `min_escrow` and find a testnet miner and model.
 
 ## Launch announcement (FLOP Labs, 23 Nov)
 

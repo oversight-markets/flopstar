@@ -1,7 +1,9 @@
-# One faucet draw into the FLOP spend account (`flop faucet --post`). Needs no credential: the faucet
-# is keyed by the spend account's public address. FlopPolicy enforces max_faucet_draws_per_day and
-# the genesis checks; a refusal (e.g. 429) is recorded as a failed draw. Started by hand or by a
-# one-off timer; not enabled on its own.
+# One faucet draw into the FLOP spend account (`flop faucet --post`). Devnet: an unsigned /fund
+# keyed by the spend account's address. Testnet: an agent claim signed by the spend key, so the unit
+# gets the spend-keystore passphrase (never the owner key). FlopPolicy enforces
+# max_faucet_draws_per_day and the genesis checks; a refusal (e.g. 429) is recorded as a failed draw.
+# An unknown testnet outcome is resent with `flop faucet --reconcile <id> --post`, never re-signed.
+# Started by hand; not enabled on its own.
 [Unit]
 Description=Flopstar FLOP faucet draw
 After=network-online.target
@@ -16,6 +18,8 @@ Environment=HOME=/var/lib/flopstar
 Environment=FLOPSTAR_DATA_DIR=/var/lib/flopstar/data
 Environment=FLOPSTAR_FLOP_CONFIG=/etc/flopstar/flop.toml
 Environment=FLOPSTAR_FLOP_KEYSTORE=/var/lib/flopstar/flop/spend.json
+Environment=FLOPSTAR_FLOP_PASSPHRASE_FILE=%d/flop-spend-passphrase
+LoadCredentialEncrypted=flop-spend-passphrase:/etc/flopstar/creds/flop-spend-passphrase.cred
 ExecStart=/opt/flopstar/.venv/bin/flopstar flop faucet --post
 
 NoNewPrivileges=true
@@ -24,7 +28,7 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/flopstar/data
 ReadOnlyPaths=/var/lib/flopstar/flop
-InaccessiblePaths=/etc/flopstar/keys /etc/flopstar/creds
+InaccessiblePaths=/etc/flopstar/keys
 
 # Kernel, device, namespace and syscall sandboxing (systemd-analyze security).
 PrivateDevices=true
