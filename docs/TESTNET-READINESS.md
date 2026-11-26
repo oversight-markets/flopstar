@@ -172,6 +172,47 @@ Next for Flopstar: deployed (`adeda32`), and `/etc/flopstar/flop.toml` switched 
 healthy). Wait for the agent-claim request format, add it to `flop/faucet.py` behind FlopPolicy, and
 draw through it. Also wait for a CLI release for 1014035 and a miner route.
 
+## Day 3 (FLOP Labs, 26 Nov; checked 12:47 UTC)
+
+FLOP Labs' post, as the owner relayed it (verbatim):
+
+> We will be allowing more agents to call the faucet once we open up mining and validation in the
+> next few hours. Please follow @flop_labs for up to date announcements.
+
+Checked (read-only GETs and `flop status`; nothing signed or posted):
+
+- **Testnet runtime is now 1014039**, so the 0.3.6 pin broke: `flop status` on `/opt` reported
+  `chain: unavailable: FLOPError: Unsupported runtime spec version 1014039`. Devnet is on 1014038.
+- **flop-sdk 0.4.1: pinned.** Diff from 0.3.6: `SUPPORTED_SPEC_VERSIONS` adds 1014037, 1014038
+  and 1014039 (range now ends at 1014039); an optional `expected_genesis_hash` on
+  `FlopClientOptions` / `SubstrateOptions` (default `None`, no check), checked against
+  `chain_getBlockHash(0)` on connect; a new `networks.py` with canonical profiles. Its testnet
+  profile matches our pins (genesis `0x918a…d800`, `wss://testnet.flop.network`,
+  `faucet.flop.network`, gateway `gateway.testnet.flop.network`). Dependencies unchanged. Flopstar
+  uses only `FlopClient.health()`, `assert_supported_runtime` and `__version__`, none changed;
+  our own genesis check stays. The escrow-profile (`tee_requirements`) note in the README was
+  already in 0.3.6. 261 tests pass; ruff clean. Local `flop status` on 0.4.1: testnet genesis
+  matches, spec 1014039, 11 peers, finalized block 168,244; devnet genesis matches, spec 1014038.
+- **Agent-claim format published**, in npm `@flop-labs/sdk` 0.12.0 (`claimTestnetAgentFunds`,
+  `faucet.js`); flop-sdk 0.4.1 still has no helper. The recipient key signs the UTF-8 message
+  `flop-faucet-agent/v1|<D10 genesis 0x918a…d800>|<ss58 address>|<nonce>` (nonce a canonical
+  1–19 digit decimal, `Date.now()` by default) after checking the faucet's `/chain` reports
+  testnet and D10. It then sends `POST /v1/testnet/agent-claims` with `{address, nonce, signature}`
+  (signature `0x` hex, 64–66 bytes). An `unknown` outcome is reconciled by resending the same
+  address, nonce and signature, never a new one.
+- **Faucet** (`/limits`, `/health`, image 0.1.509): `status: open`; agent 10 FLOP, 10 FLOP
+  rolling 24 h cap, `rolloverRequiresSpend: true`; anonymous 25; linked 500 (2,000 per 7 days);
+  3 grants per IP per day; daily cap 11M FLOP, 8.3M used at 12:46 UTC; 0 pending grants. Miner
+  and validator sponsorship are `automatic_full` (15 miners sponsored, 1 validator).
+- **Gateway** `gateway.testnet.flop.network` now resolves and `/health` returns 200.
+- **CLI:** `releases.json` names v0.1.505; npm has `@flop-labs/cli` 0.9.1 and sdk 0.12.1. Not
+  re-pinned (still v0.1.455, which refuses testnet); do it with the blocker-2 check before the
+  first ask.
+
+Next for Flopstar: deploy 0.4.1 to `/opt` and confirm `flop status` there; add the agent claim to
+`flop/faucet.py` behind FlopPolicy (dry run prints the message; the owner runs `--post`); re-pin
+the CLI; raise the testnet caps above `min_escrow` and find a testnet miner and model.
+
 ## Launch announcement (FLOP Labs, 23 Nov)
 
 FLOP Labs' last post before launch, as the owner relayed it (verbatim):
