@@ -213,7 +213,30 @@ Next for Flopstar: ~~deploy 0.4.1 to `/opt` and confirm `flop status` there~~ (d
 spec 1014039, spend balance 0); ~~add the agent claim to `flop/faucet.py` behind FlopPolicy~~
 (done: `faucet` on testnet makes the signed claim, `--reconcile ID` resends an unknown one; see
 FLOP.md §12 "Testnet agent claim"; the owner runs `--post` via `flopstar-flop-faucet.service`);
-re-pin the CLI; ~~raise the testnet caps above `min_escrow`~~ (1 / 5 FLOP, 26 Nov; floor 0.05 confirmed on runtime 1014039); find a testnet miner and model.
+~~re-pin the CLI~~ (v0.1.505, below); ~~raise the testnet caps above `min_escrow`~~ (1 / 5 FLOP, 26 Nov; floor 0.05 confirmed on runtime 1014039); find a testnet miner and model.
+
+### CLI re-pin, 26 Nov
+
+`flop/config.py` now pins
+`ghcr.io/flop-labs/flop-core/cli:v0.1.505@sha256:d06643e5f4407347da4a4fdf64e8dd3e23e2b6e96f0e2c1576d64ac5eca58546`
+(`cli_npm_version` 0.9.1) for **both** profiles; testnet had no image before (S5). Checked on the
+droplet with the blocker-2 procedure:
+
+- `releases.json` names that image (minimum still 0.1.172); GHCR's `v0.1.505` tag returns the
+  same digest, and the image was pulled by digest.
+- It is `@flop-labs/cli` **0.9.1**, bundling `@flop-labs/sdk` **0.12.1**: range
+  `1013000..1014039`, admitting 1014035, 1014037, 1014038 and 1014039. v0.1.455's bundled 0.9.0
+  stopped at 1014034.
+- `--version` → `0.1.505`. Global `--help` gains only `--rpc-timeout <ms>` (optional); `session
+  run --help` is identical; every flag Flopstar passes is present.
+- In `dist/cli.js` the `session run` success `print({...})` block and `SESSION_FAILED` handler are
+  unchanged (after normalising bundler renames). Nearby changes are in other commands (default offer
+  indexer, `session key` limit parsing). The SDK's `compute-channel/direct-session.js` differs
+  only by passing `pricePerGn` into the force-settle bound (the testnet pricing fix); result
+  fields and the `(channel 0x…)` / "on-chain recovery failed" texts are unchanged.
+- Run like production (`--memory 640m --memory-swap 1g --pids-limit 256`, `--network host`):
+  read-only `health` on testnet (`connected: true`, chain "FLOP Testnet") and `balance` of the
+  spend account on testnet (0) and devnet (25 FLOP). Peak container memory 177 MiB.
 
 ## Launch announcement (FLOP Labs, 23 Nov)
 

@@ -328,7 +328,9 @@ Alternatives, if FLOP confirms the DID account is what must spend on testnet:
   `v0.1.220`. Are they the same code? Which does FLOP support for testnet `session run`?
   *Partly answered 22 Nov:* the container is built from the npm package (image `v0.1.418` holds
   `@flop-labs/cli` 0.7.1 per its `package.json`; 23 Nov: `v0.1.455` holds 0.8.0, matching npm's
-  latest). Which build FLOP supports on testnet is still open.
+  latest). *Answered 26 Nov:* `releases.json` publishes one CLI image for both networks; `v0.1.505`
+  (cli 0.9.1, sdk 0.12.1) admits testnet's runtime 1014039 and has the testnet agent claim, and is
+  pinned for both profiles.
 - **S6. Settled amount and evidence.** `session run --json` reports neither the settled amount nor
   receipt contents or token IDs. Read `Settled.minerPaid` from chain events by `settle_tx`? Is there
   a CLI flag (or SDK call) that exports the verified receipts/transcript for Touchstone?

@@ -53,8 +53,12 @@ class NetworkProfile:
 
 
 # sdk:chain.js FLOP_NETWORK_PROFILES; devnet genesis and HTTPS RPC observed 2026-11-01 (FLOP.md §4);
-# CLI image pin from https://flop.network/releases.json on 2026-11-23 (v0.1.455 = @flop-labs/cli
-# 0.8.0 per the image's package.json, bundling @flop-labs/sdk 0.9.0: runtimes up to 1014034).
+# CLI image pin from https://flop.network/releases.json on 2026-11-26 (v0.1.505 = @flop-labs/cli
+# 0.9.1 per the image's package.json, bundling @flop-labs/sdk 0.12.1: runtimes up to 1014039,
+# so devnet 1014038 and testnet 1014039; docs/TESTNET-READINESS.md "CLI re-pin, 26 Nov").
+CLI_IMAGE = ("ghcr.io/flop-labs/flop-core/cli:v0.1.505"
+             "@sha256:d06643e5f4407347da4a4fdf64e8dd3e23e2b6e96f0e2c1576d64ac5eca58546")
+
 BUILTIN_PROFILES = {
     "devnet": NetworkProfile(
         name="devnet",
@@ -65,11 +69,8 @@ BUILTIN_PROFILES = {
         indexer_url="https://explorer.devnet.flop.network",
         mcp_url="https://mcp.flop.network/mcp",
         genesis_hash="0x99c172c095340ace980631f9123544c6bebd4839f3437e463533422d8be2d631",
-        cli_npm_version="0.8.0",
-        cli_image=(
-            "ghcr.io/flop-labs/flop-core/cli:v0.1.455"
-            "@sha256:bddf38047b88c9b699474e090a6edd8345a51f986154c3c70f6eb676afcd06f8"
-        ),
+        cli_npm_version="0.9.1",
+        cli_image=CLI_IMAGE,
         # Read from the devnet runtime (spec_version 1014003) on 2026-11-04; re-read unchanged at
         # spec 1014031 on 2026-11-22 and spec 1014034 on 2026-11-23.
         min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
@@ -89,9 +90,10 @@ BUILTIN_PROFILES = {
         indexer_url=None,
         mcp_url=None,
         genesis_hash="0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
-        cli_npm_version="0.8.0",
-        cli_image=None,  # SPEC(S5): which CLI build FLOP supports on testnet
-        # Read from the testnet runtime (spec 1014035) on 2026-11-24.
+        cli_npm_version="0.9.1",
+        cli_image=CLI_IMAGE,  # the same release FLOP publishes for both networks
+        # Read from the testnet runtime (spec 1014035) on 2026-11-24; re-read unchanged at spec
+        # 1014039 on 2026-11-26 (ComputeChannel.MinForceOpenEscrowForFailedAck).
         min_escrow=50_000_000_000_000_000,  # 0.05 FLOP
     ),
 }

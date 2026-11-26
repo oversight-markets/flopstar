@@ -104,8 +104,8 @@ def test_cli_prefix_needs_a_runtime(tmp_path, monkeypatch):
     with pytest.raises(RouteUnavailable, match="Docker"):
         inference.cli_prefix(cfg, which=lambda _: None)
     prefix, keystore, version = inference.cli_prefix(cfg, which=docker)
-    assert prefix[-1].endswith("@sha256:bddf38047b88c9b699474e090a6edd8345a51f986154c3c70f6eb676afcd06f8")
-    assert keystore == "/keys/spend.json" and version == "v0.1.455"
+    assert prefix[-1].endswith("@sha256:d06643e5f4407347da4a4fdf64e8dd3e23e2b6e96f0e2c1576d64ac5eca58546")
+    assert keystore == "/keys/spend.json" and version == "v0.1.505"
     assert f"{cfg.keystore_path.parent}:/keys:ro" in prefix
     # Memory, swap and process caps come before the image name.
     limits = prefix[:prefix.index(prefix[-1])]
