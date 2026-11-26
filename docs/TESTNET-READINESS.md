@@ -213,7 +213,7 @@ Next for Flopstar: ~~deploy 0.4.1 to `/opt` and confirm `flop status` there~~ (d
 spec 1014039, spend balance 0); ~~add the agent claim to `flop/faucet.py` behind FlopPolicy~~
 (done: `faucet` on testnet makes the signed claim, `--reconcile ID` resends an unknown one; see
 FLOP.md §12 "Testnet agent claim"; the owner runs `--post` via `flopstar-flop-faucet.service`);
-re-pin the CLI; raise the testnet caps above `min_escrow` and find a testnet miner and model.
+re-pin the CLI; ~~raise the testnet caps above `min_escrow`~~ (1 / 5 FLOP, 26 Nov; floor 0.05 confirmed on runtime 1014039); find a testnet miner and model.
 
 ## Launch announcement (FLOP Labs, 23 Nov)
 
