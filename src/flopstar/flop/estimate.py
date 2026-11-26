@@ -12,12 +12,18 @@ The estimate is a deliberate upper bound from public data only (no key, no miner
     cost    = tokens x max(pricing.prompt, pricing.completion)   # gateway price, FLOP per token
     escrow  = max(cost, min_escrow)          # [<network>].min_escrow in flop.toml
 
+When the model-wide `pricing` is zero (testnet, 26 Nov 2026: `source` "testnet-no-usd-value"),
+the price is the miners' own FLOP price from `x-flop.price_sources`: flop_per_gn x
+max(gn_per_prompt_token, gn_per_completion_token), rounded up to the source's decimal places. With
+--miner it is that miner's live price; without, the highest live price in the row. (On devnet the
+same product equals the model-wide price: 0.0000005 x 2 = 0.000001.)
+
 - Byte-level BPE (Qwen2.5) never yields more regular tokens than UTF-8 bytes, so the prompt bound
   holds for any text; TEMPLATE_TOKENS covers the chat template (default system prompt and role
   markers) the miner wraps around one user message. Measured with the real Qwen2.5 tokenizer
   (tests/test_flop_estimate.py): 29 tokens with an empty user message.
-- No division anywhere: prices parse exactly to int base units (more than 18 decimals is refused,
-  never rounded) and cost is int x int, so there is nothing to round down.
+- Nothing rounds down: prices parse exactly to int base units (more than 18 decimals is refused,
+  never rounded), cost is int x int, and a per-miner price is only ever rounded up.
 - The escrow is the bill (one observed devnet settle, block 2796872: no refund; the 1% audit
   earmark comes out of the escrow), so this bound sets the cost, not only the safety margin.
 - The gateway prices per token: its figure is `flop_per_gn x gnPerPromptToken`, with
@@ -60,7 +66,8 @@ class Estimate:
     def describe(self) -> dict:
         return {"prompt_tokens_max": self.prompt_tokens_max,
                 "output_tokens_max": self.output_tokens_max,
-                # The gateway's model-wide price; not a quote from the chosen miner.
+                # The gateway's model-wide price, or (if that is zero) the chosen miner's / the
+                # highest live per-miner catalog price; not a quote from the miner itself.
                 "catalog_price_per_token": format_flop(self.raw_per_token),
                 "cost": format_flop(self.cost_raw),
                 "escrow": format_flop(self.escrow_raw),
@@ -106,31 +113,71 @@ def price_from_catalog(body: bytes, model: str, miner: str | None,
         raise EstimateUnavailable(f"catalog has no pricing for {model!r}")
     per_token = max(_price(pricing.get("prompt"), "prompt"),
                     _price(pricing.get("completion"), "completion"))
+    live = _live_sources(row, miner, now or datetime.now(UTC))
+    if miner is not None and not live:
+        raise EstimateUnavailable(f"catalog has no live price for miner {miner}")
+    if per_token > 0:
+        return per_token
+    # A zero model-wide price is not a free model: testnet publishes no USD value
+    # ("testnet-no-usd-value") and prices only per miner, in FLOP. Take the highest live one.
+    if not live:
+        raise EstimateUnavailable(f"catalog prices {model!r} at zero and has no live miner "
+                                  "price; refusing to guess")
+    per_token = max(_source_price(s) for s in live)
     if per_token <= 0:
         raise EstimateUnavailable(f"catalog prices {model!r} at zero; refusing to guess")
+    return per_token
+
+
+def _live_sources(row: dict, miner: str | None, now: datetime) -> list[dict]:
+    """Price sources with effective_at <= now < expires_at, only `miner`'s if one is named."""
+    want = None
     if miner is not None:
-        now = now or datetime.now(UTC)
-        sources = (row.get("x-flop") or {}).get("price_sources")
         try:
             want = ss58_pubkey(miner)
         except ConfigError as e:
             raise EstimateUnavailable(str(e)) from None
-        live = False
-        for s in sources if isinstance(sources, list) else []:
-            if not isinstance(s, dict) or not isinstance(s.get("miner_address"), str):
-                continue
+    sources = (row.get("x-flop") or {}).get("price_sources")
+    live = []
+    for s in sources if isinstance(sources, list) else []:
+        if not isinstance(s, dict) or not isinstance(s.get("miner_address"), str):
+            continue
+        if want is not None:
             try:
                 if ss58_pubkey(s["miner_address"]) != want:
                     continue
             except ConfigError:
                 continue
-            effective = _parse_time(s.get("effective_at"))
-            expires = _parse_time(s.get("expires_at"))
-            if effective is not None and expires is not None and effective <= now < expires:
-                live = True
-        if not live:
-            raise EstimateUnavailable(f"catalog has no live price for miner {miner}")
-    return per_token
+        effective = _parse_time(s.get("effective_at"))
+        expires = _parse_time(s.get("expires_at"))
+        if effective is not None and expires is not None and effective <= now < expires:
+            live.append(s)
+    return live
+
+
+def _gn(value, what: str) -> int:
+    if not isinstance(value, str) or not value.isascii() or not value.isdigit() \
+            or (len(value) > 1 and value[0] == "0"):
+        raise EstimateUnavailable(f"catalog {what} is not a canonical decimal integer string")
+    return int(value)
+
+
+def _source_price(s: dict) -> int:
+    """Raw FLOP per token from one miner's price source, rounded up, never down.
+
+    flop_per_gn x max(gn_per_prompt_token, gn_per_completion_token), then rounded up to the
+    source's `rounding.decimal_places` (the gateway rounds up there). Rounding each token up
+    bounds the gateway's rounded total from above.
+    """
+    per_gn = _price(s.get("flop_per_gn"), "flop_per_gn")
+    gn = max(_gn(s.get("gn_per_prompt_token"), "gn_per_prompt_token"),
+             _gn(s.get("gn_per_completion_token"), "gn_per_completion_token"))
+    rounding = s.get("rounding")
+    places = rounding.get("decimal_places") if isinstance(rounding, dict) else None
+    if type(places) is not int or not 0 <= places <= 18:
+        raise EstimateUnavailable("catalog price source has no usable rounding.decimal_places")
+    unit = 10 ** (18 - places)
+    return -(-(per_gn * gn) // unit) * unit
 
 
 def fetch_price(cfg: FlopConfig, model: str, miner: str | None,

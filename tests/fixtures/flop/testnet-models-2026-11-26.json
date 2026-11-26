@@ -1,0 +1,283 @@
+{
+ "data": [
+  {
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "modality": "text->text",
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "canonical_slug": "qwen/qwen3-14b",
+   "context_length": 40960,
+   "created": 1795653660,
+   "default_parameters": null,
+   "id": "qwen/qwen3-14b",
+   "links": {
+    "details": "/api/v1/models/qwen%2Fqwen3-14b"
+   },
+   "name": "Qwen3 14B (FLOP Testnet)",
+   "object": "model",
+   "owned_by": "flop-network",
+   "per_request_limits": {
+    "completion_tokens": 40960,
+    "prompt_tokens": 0
+   },
+   "pricing": {
+    "completion": "0",
+    "input_cache_read": "0",
+    "prompt": "0"
+   },
+   "supported_parameters": [
+    "max_tokens",
+    "temperature",
+    "top_p"
+   ],
+   "supported_voices": null,
+   "top_provider": {
+    "context_length": 40960,
+    "is_moderated": false,
+    "max_completion_tokens": 40960
+   },
+   "x-flop": {
+    "backend": "vllm",
+    "backend_model_name": "Qwen/Qwen3-14B",
+    "capacity_rule": "sum(floor(unique_healthy_session_capacity_tpm * 0.8))",
+    "capacity_tpm": 43754490,
+    "datacenters": [
+     {
+      "country_code": "ZZ"
+     }
+    ],
+    "decode_policy": "flop.hf-chat-template.v1",
+    "decode_policy_hash": "0x8fa45b84c476af71bf13884ee695be58b822ae06dd2ab62a34fcab5809570c05",
+    "measurements": {
+     "capacity_tpm": {
+      "expires_at": "2026-11-26T22:29:20.459Z",
+      "observed_at": "2026-11-26T21:55:51.763Z",
+      "provenance": "admission-derived-capacity",
+      "rule": "sum(floor(unique_healthy_session_capacity_tpm * 0.8))",
+      "sample_count": null,
+      "unit": "tokens/min",
+      "value": 43754490
+     },
+     "latency_ms": null,
+     "quality": null,
+     "throughput_tokens_per_second": null
+    },
+    "model_hash": "0x4f8fcb1427199f8eaeaab751b6df123366a5792d021a695223c2c78e9e2634ce",
+    "precision": 2,
+    "precision_detail": {
+     "activations": null,
+     "kv_cache": null,
+     "weights": "bf16"
+    },
+    "price_sources": [
+     {
+      "effective_at": "2026-11-26T21:55:18.000Z",
+      "expires_at": "2026-11-26T21:57:18.000Z",
+      "flop_per_gn": "0.00000002",
+      "flop_usd": "0",
+      "gn_per_completion_token": "30",
+      "gn_per_prompt_token": "30",
+      "miner_address": "5CAhrEizf3igjCUEFRKvMLr2Y87vy9c53ZU9zRKkesqenvWf",
+      "ratified_at": "2026-11-26T21:55:18.000Z",
+      "rounding": {
+       "decimal_places": 12,
+       "mode": "ceil"
+      },
+      "source": "testnet-no-usd-value",
+      "version": "chain:199586"
+     },
+     {
+      "effective_at": "2026-11-26T21:55:18.000Z",
+      "expires_at": "2026-11-26T21:57:18.000Z",
+      "flop_per_gn": "0.00000002",
+      "flop_usd": "0",
+      "gn_per_completion_token": "30",
+      "gn_per_prompt_token": "30",
+      "miner_address": "5CCnq4bPAYyopdDjEjQu8XmRMHGGtd8XdiXFHhkTmnc1gSLj",
+      "ratified_at": "2026-11-26T21:55:18.000Z",
+      "rounding": {
+       "decimal_places": 12,
+       "mode": "ceil"
+      },
+      "source": "testnet-no-usd-value",
+      "version": "chain:199586"
+     },
+     {
+      "effective_at": "2026-11-26T21:55:18.000Z",
+      "expires_at": "2026-11-26T21:57:18.000Z",
+      "flop_per_gn": "0.00000002",
+      "flop_usd": "0",
+      "gn_per_completion_token": "30",
+      "gn_per_prompt_token": "30",
+      "miner_address": "5CDPj72LbhbMK64EBCuPFgC33D5TtnnCPkcQc9w9b14cGuEr",
+      "ratified_at": "2026-11-26T21:55:18.000Z",
+      "rounding": {
+       "decimal_places": 12,
+       "mode": "ceil"
+      },
+      "source": "testnet-no-usd-value",
+      "version": "chain:199586"
+     }
+    ],
+    "quantization": "bf16",
+    "registry_model": "Qwen/Qwen3-14B",
+    "registry_precision": "BF16",
+    "registry_version": "1",
+    "serving_profile": {
+     "chat_profile": "flop.hf-chat-template.v1",
+     "max_model_len": 40960,
+     "max_output_tokens": 40960,
+     "tool_parser": "hermes",
+     "version": "flop.text-serving.v1"
+    }
+   }
+  },
+  {
+   "architecture": {
+    "input_modalities": [
+     "text"
+    ],
+    "modality": "text->text",
+    "output_modalities": [
+     "text"
+    ]
+   },
+   "canonical_slug": "qwen/qwen3-8b",
+   "context_length": 40960,
+   "created": 1795653660,
+   "default_parameters": null,
+   "id": "qwen/qwen3-8b",
+   "links": {
+    "details": "/api/v1/models/qwen%2Fqwen3-8b"
+   },
+   "name": "Qwen3 8B (FLOP Testnet)",
+   "object": "model",
+   "owned_by": "flop-network",
+   "per_request_limits": {
+    "completion_tokens": 40960,
+    "prompt_tokens": 0
+   },
+   "pricing": {
+    "completion": "0",
+    "input_cache_read": "0",
+    "prompt": "0"
+   },
+   "supported_parameters": [
+    "max_tokens",
+    "temperature",
+    "top_p"
+   ],
+   "supported_voices": null,
+   "top_provider": {
+    "context_length": 40960,
+    "is_moderated": false,
+    "max_completion_tokens": 40960
+   },
+   "x-flop": {
+    "backend": "vllm",
+    "backend_model_name": "Qwen/Qwen3-8B",
+    "capacity_rule": "sum(floor(unique_healthy_session_capacity_tpm * 0.8))",
+    "capacity_tpm": 46992077,
+    "datacenters": [
+     {
+      "country_code": "ZZ"
+     }
+    ],
+    "decode_policy": "flop.hf-chat-template.v1",
+    "decode_policy_hash": "0xe991156ea50360c72a72245ce48f13dda2b4fb5a3abf146872abe93b2c0587a9",
+    "measurements": {
+     "capacity_tpm": {
+      "expires_at": "2026-11-26T22:49:17.020Z",
+      "observed_at": "2026-11-26T21:55:52.458Z",
+      "provenance": "admission-derived-capacity",
+      "rule": "sum(floor(unique_healthy_session_capacity_tpm * 0.8))",
+      "sample_count": null,
+      "unit": "tokens/min",
+      "value": 46992077
+     },
+     "latency_ms": null,
+     "quality": null,
+     "throughput_tokens_per_second": null
+    },
+    "model_hash": "0x2dc476dabd39fb86d216e04f3c50313a22fa9e5bfa65f8e236557c30ddfaba55",
+    "precision": 2,
+    "precision_detail": {
+     "activations": null,
+     "kv_cache": null,
+     "weights": "bf16"
+    },
+    "price_sources": [
+     {
+      "effective_at": "2026-11-26T21:55:18.000Z",
+      "expires_at": "2026-11-26T21:57:18.000Z",
+      "flop_per_gn": "0.00000002",
+      "flop_usd": "0",
+      "gn_per_completion_token": "17",
+      "gn_per_prompt_token": "17",
+      "miner_address": "5CahErGrdtS69J2VBSkGEhhbQxj46WgnfVJvKHg6iDNfnjn4",
+      "ratified_at": "2026-11-26T21:55:18.000Z",
+      "rounding": {
+       "decimal_places": 12,
+       "mode": "ceil"
+      },
+      "source": "testnet-no-usd-value",
+      "version": "chain:199586"
+     },
+     {
+      "effective_at": "2026-11-26T21:55:18.000Z",
+      "expires_at": "2026-11-26T21:57:18.000Z",
+      "flop_per_gn": "0.00000002",
+      "flop_usd": "0",
+      "gn_per_completion_token": "17",
+      "gn_per_prompt_token": "17",
+      "miner_address": "5CfytGUPzbaASB5BWudopd6cDTEtyiD2vcMSVz5M1vcbJsxC",
+      "ratified_at": "2026-11-26T21:55:18.000Z",
+      "rounding": {
+       "decimal_places": 12,
+       "mode": "ceil"
+      },
+      "source": "testnet-no-usd-value",
+      "version": "chain:199586"
+     },
+     {
+      "effective_at": "2026-11-26T21:55:18.000Z",
+      "expires_at": "2026-11-26T21:57:18.000Z",
+      "flop_per_gn": "0.00000002",
+      "flop_usd": "0",
+      "gn_per_completion_token": "17",
+      "gn_per_prompt_token": "17",
+      "miner_address": "5CiASes8KyPrYuBmynWDjYp3oFR721d4yCAps56NQbZLVLGP",
+      "ratified_at": "2026-11-26T21:55:18.000Z",
+      "rounding": {
+       "decimal_places": 12,
+       "mode": "ceil"
+      },
+      "source": "testnet-no-usd-value",
+      "version": "chain:199586"
+     }
+    ],
+    "quantization": "bf16",
+    "registry_model": "Qwen/Qwen3-8B",
+    "registry_precision": "BF16",
+    "registry_version": "1",
+    "serving_profile": {
+     "chat_profile": "flop.hf-chat-template.v1",
+     "max_model_len": 40960,
+     "max_output_tokens": 40960,
+     "tool_parser": "hermes",
+     "version": "flop.text-serving.v1"
+    }
+   }
+  }
+ ],
+ "links": {
+  "next": null
+ },
+ "object": "list",
+ "total_count": 2
+}

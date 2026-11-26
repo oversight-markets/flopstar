@@ -454,7 +454,14 @@ escrow = max(cost, [<network>].min_escrow)                   # devnet 0.05 FLOP
 - Prices parse exactly to base units (more than 18 decimals is refused), and cost is int × int:
   nothing is rounded.
 - The price is the gateway's model-wide price (`catalog_price_per_token`), not a quote from the
-  miner. For the direct route the chosen miner must have a price source with
+  miner. When that price is zero (testnet since 26 Nov 2026: `pricing` is `"0"` and every price
+  source says `testnet-no-usd-value`), the price is the miners' own FLOP price from
+  `x-flop.price_sources`: `flop_per_gn × max(gn_per_prompt_token, gn_per_completion_token)`,
+  rounded up to the source's `rounding.decimal_places`. With `--miner` that miner's live price,
+  otherwise the highest live price in the row (26 Nov: qwen3-8b 0.00000034, qwen3-14b 0.0000006
+  FLOP/token, so every short ask sits at the 0.05 floor). On devnet the product equals the
+  model-wide price (0.0000005 × 2 = 0.000001). Prices expire 2 minutes after they're published, and
+  the catalog sometimes returns an empty `data` list: both mean no estimate. For the direct route the chosen miner must have a price source with
   `effective_at ≤ now < expires_at`. The miner that was priced is the one planned and sent.
 - `min_escrow` is `computeChannel.minForceOpenEscrowForFailedAck`, read from the devnet runtime
   (spec 1014003; re-read unchanged at 0.05 FLOP at spec 1014031 on 22 Nov and 1014034 on 23 Nov). The runtime doesn't
@@ -462,7 +469,7 @@ escrow = max(cost, [<network>].min_escrow)                   # devnet 0.05 FLOP
   against the miner, and smaller opens still expire with a full refund. Flopstar uses it as a
   floor so that a miner who doesn't answer is held to account. Testnet has none until it is read from the live runtime, so nothing is sized
   there.
-- Fails closed: no catalog, a malformed or zero price, a duplicate model row, no live price for
+- Fails closed: no catalog, a malformed price, a zero price with no live miner price, a duplicate model row, no live price for
   the miner, or no `min_escrow` means no estimate, and the request is refused unless `--max-flop`
   is given. `--max-flop` must be positive; below the estimate it only warns (the miner may refuse
   the turn). Escrow above `max_flop_per_request` is refused, never clipped.

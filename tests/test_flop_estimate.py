@@ -154,3 +154,89 @@ def test_rendered_prompt_tokens_within_the_size_bound(qwen, prompt):
     # including special tokens a prompt may spell out.
     n = len(qwen.encode(qwen_render(prompt)).ids)
     assert n <= estimate.size(prompt, 1, PRICE, FLOOR).prompt_tokens_max
+
+
+# ---- testnet: zero model-wide price, per-miner FLOP prices (real catalog, 26 Nov 2026) ----------
+
+TESTNET_CATALOG = Path(__file__).parent / "fixtures" / "flop" / "testnet-models-2026-11-26.json"
+TESTNET_NOW = datetime(2026, 11, 26, 21, 56, tzinfo=UTC)  # inside every source's 2-minute window
+Q14 = "qwen/qwen3-14b"
+Q8 = "qwen/qwen3-8b"
+Q8_MINER = "5CfytGUPzbaASB5BWudopd6cDTEtyiD2vcMSVz5M1vcbJsxC"
+
+
+def _testnet_catalog() -> dict:
+    import json
+    return json.loads(TESTNET_CATALOG.read_bytes())
+
+
+def _testnet_price(body: dict, model: str, miner: str | None = None,
+                  now: datetime = TESTNET_NOW) -> int:
+    import json
+    return estimate.price_from_catalog(json.dumps(body).encode(), model, miner, now=now)
+
+
+def test_testnet_zero_price_falls_back_to_the_miners_flop_price():
+    body = _testnet_catalog()
+    assert all(r["pricing"]["prompt"] == "0" for r in body["data"])
+    # 0.00000002 FLOP/GN x 30 GN per token; 0.00000002 x 17.
+    assert _testnet_price(body, Q14) == 6 * 10**11
+    assert _testnet_price(body, Q8) == 34 * 10**10
+    assert _testnet_price(body, Q8, Q8_MINER) == 34 * 10**10
+    e = estimate.size("Reply OK.", 32, _testnet_price(body, Q8), FLOOR)
+    assert e.cost_raw == 81 * 34 * 10**10 and e.escrow_raw == FLOOR
+
+
+def test_testnet_takes_the_highest_live_price_or_the_named_miners():
+    body = _testnet_catalog()
+    sources = body["data"][1]["x-flop"]["price_sources"]
+    assert body["data"][1]["id"] == Q8
+    sources[0]["gn_per_completion_token"] = "40"  # one miner dearer on completion
+    assert _testnet_price(body, Q8) == 8 * 10**11
+    assert _testnet_price(body, Q8, Q8_MINER) == 34 * 10**10
+    sources[0]["expires_at"] = "2026-11-26T21:55:59.000Z"  # the dear one is no longer live
+    assert _testnet_price(body, Q8) == 34 * 10**10
+
+
+def test_testnet_per_miner_price_rounds_up_to_its_decimal_places():
+    body = _testnet_catalog()
+    for s in body["data"][1]["x-flop"]["price_sources"]:
+        s["flop_per_gn"] = "0.0000000000003"  # x 17 = 0.0000000000051, 12 places: ...006
+    assert _testnet_price(body, Q8) == 6 * 10**6
+
+
+@pytest.mark.parametrize("field,value,match", [
+    ("flop_per_gn", "2e-8", "flop_per_gn"),
+    ("flop_per_gn", 0.00000002, "not a decimal string"),
+    ("gn_per_prompt_token", "17.0", "canonical"),
+    ("gn_per_prompt_token", "017", "canonical"),
+    ("gn_per_prompt_token", 17, "canonical"),
+    ("gn_per_completion_token", "-1", "canonical"),
+    ("rounding", None, "decimal_places"),
+    ("rounding", {"mode": "ceil", "decimal_places": 19}, "decimal_places"),
+    ("rounding", {"mode": "ceil", "decimal_places": True}, "decimal_places"),
+    ("flop_per_gn", "0", "at zero"),
+])
+def test_testnet_per_miner_price_fails_closed(field, value, match):
+    body = _testnet_catalog()
+    for s in body["data"][1]["x-flop"]["price_sources"]:
+        s[field] = value
+    with pytest.raises(EstimateUnavailable, match=match):
+        _testnet_price(body, Q8)
+
+
+def test_testnet_zero_price_without_a_live_source_is_refused():
+    body = _testnet_catalog()
+    with pytest.raises(EstimateUnavailable, match="no live miner price"):
+        _testnet_price(body, Q8, now=datetime(2026, 11, 26, 21, 57, 18, tzinfo=UTC))
+    body["data"][1]["x-flop"]["price_sources"] = []
+    with pytest.raises(EstimateUnavailable, match="no live miner price"):
+        _testnet_price(body, Q8)
+    with pytest.raises(EstimateUnavailable, match="no live price for miner"):
+        _testnet_price(_testnet_catalog(), Q8, MINER)  # a miner the row doesn't price
+
+
+def test_testnet_empty_catalog_is_refused():
+    # The live catalog briefly returned {"data": []} on 26 Nov 2026.
+    with pytest.raises(EstimateUnavailable, match="0 times"):
+        _testnet_price({"object": "list", "data": [], "total_count": 0}, Q8)

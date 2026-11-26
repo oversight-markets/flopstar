@@ -4,7 +4,15 @@ import pytest
 
 from flopstar.flop import cli
 from flopstar.flop.wallet import create_spend_keystore
-from tests.flop_helpers import BLOCKED, MODEL, SERVING, catalog_body, catalog_transport, make_full
+from tests.flop_helpers import (
+    BLOCKED,
+    MINER,
+    MODEL,
+    SERVING,
+    catalog_body,
+    catalog_transport,
+    make_full,
+)
 
 
 def explode(*a, **k):
@@ -133,7 +141,9 @@ def test_ask_refuses_when_estimate_exceeds_the_ceiling(isolated, monkeypatch):
                       "--miner", SERVING, "--post"])
 
 
-@pytest.mark.parametrize("body", [b"not json", catalog_body(price="-1"), catalog_body(price="0"),
+@pytest.mark.parametrize("body", [b"not json", catalog_body(price="-1"),
+                                  catalog_body(price="0", miners=[MINER]),  # zero, SERVING unpriced
+                                  catalog_body(price="0", expires_at="2000-01-01T00:00:00Z"),
                                   catalog_body(miners=[]),
                                   catalog_body(expires_at="2000-01-01T00:00:00Z"),
                                   catalog_body(model="other/model")])
@@ -169,7 +179,6 @@ def test_plan_and_execute_use_the_miner_that_was_priced(isolated, monkeypatch, c
     # Even if choose_miner gave a different answer on a second unrequested call, the plan (and
     # so execute, via view["miner"]) must use the miner the estimate priced.
     from flopstar.flop import inference
-    from tests.flop_helpers import MINER
     create_spend_keystore(isolated, "correct horse battery staple")
     roomy_caps(isolated)
     real, unrequested = inference.choose_miner, iter([SERVING, MINER, MINER])

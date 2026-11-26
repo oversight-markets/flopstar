@@ -14,3 +14,10 @@ first time a devnet session runs, and drop `SYNTHETIC` from the file name.
 `c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539`), gzipped. `LICENSE` is that
 repo's Apache-2.0 license. `tests/test_flop_estimate.py` uses it to check that
 `estimate.TEMPLATE_TOKENS` covers the chat template the miner wraps around one user message.
+
+## `testnet-models-2026-11-26.json` — real
+
+`GET https://gateway.testnet.flop.network/v1/models` at 21:56 UTC on 26 Nov 2026, trimmed to the
+first three price sources per model (the live rows had 50 and 46) and pretty-printed. Model-wide
+`pricing` is `"0"`; the per-miner FLOP price is in `x-flop.price_sources`. Used by
+`tests/test_flop_estimate.py` for the zero-price fallback.
