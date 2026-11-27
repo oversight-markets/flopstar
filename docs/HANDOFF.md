@@ -594,6 +594,14 @@ was running, so nothing was interrupted. Fixed with the swap file and the contai
   (`/enroll/wallet*`) devnet-only (404 on testnet). It also declares x402 (402 → HTLC →
   `X-Payment-Proof`); unprobed, and the SDK client parses the price as a float and pays what the
   gateway names, so it would need our caps and exact amounts first.
+- **27 Nov: FLOP's guides checked, still blocked.** The send-to-specific-miner, agent-integration
+  and agent-onboarding guides on `ask.flop.finance` are devnet-only. They assume a known endpoint
+  and publish no miner directory or "miner-pin" route. Gateway access is issuer-only (no default
+  quota). A gateway allowance spends the broker's funds, not our wallet, so only a direct session
+  can spend our 10 FLOP. Until we spend some, the faucet refuses the next agent claim
+  (`agent_spend_missing`), so don't run it yet. FLOP announced a browser "FLOP Chat" webapp (no date);
+  check how it reaches miners when it ships, and never import the spend key into it. Details:
+  [TESTNET-READINESS.md](TESTNET-READINESS.md) "Day 4" sections.
 - **Decided 26 Nov (owner):** wait for FLOP to publish miner-endpoint discovery or testnet gateway
   access; no x402 probe and no questions to FLOP about S3/S4 until the owner asks. When either
   lands: add the miner under `[testnet.miners]` (or the key), dry-run
