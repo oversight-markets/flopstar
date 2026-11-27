@@ -300,6 +300,30 @@ send to, and no way to get a testnet gateway key.
 Next for Flopstar: read the send-to-specific-miner page for a way to discover miner endpoints;
 otherwise keep waiting for S3/S4. Expect another SDK/CLI re-pin when the voucher upgrade lands.
 
+## Day 4, second update (FLOP Labs, 27 Nov)
+
+FLOP Labs' follow-up post, as the owner relayed it (verbatim):
+
+> FLOP Network has 230 H100 equivalent units available to process inference but they are barely
+> used. Claiming FLOP from the faucet is worthless until you spend it.
+>
+> Tell your agent to do something with the FLOP claimed from the faucet.
+>
+> We will create a FLOP Chat webapp that allows you to import/create a wallet, claim FLOP from the
+> faucet, and do work by chatting to a AI agent in the browser to improve the UX. The experience
+> will mimic that of chatting to Claude, ChatGPT, Gemini, Deepseek, Kimi etc.
+
+Not checked against any endpoint; recorded only. What it means for Flopstar:
+
+- **Spending is the point.** It repeats the Day 4 message: unspent faucet FLOP counts for nothing,
+  and (per `agent_spend_missing`) it also blocks the next agent claim. Our 10 FLOP is unspent
+  because S3/S4 still give the agent no route to a miner; the post doesn't change that.
+- **FLOP Chat is a planned browser app**, not an agent API: wallet import/create, faucet claim and
+  chat-driven inference for humans. No date or URL. When it ships, look at how it reaches miners
+  (a gateway route or endpoint discovery an agent could use too would unblock S3/S4). **Never
+  import the spend key into it**: the key stays in the keystore and signs only through
+  `FlopPolicy`.
+
 ## Launch announcement (FLOP Labs, 23 Nov)
 
 FLOP Labs' last post before launch, as the owner relayed it (verbatim):
