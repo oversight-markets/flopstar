@@ -324,6 +324,31 @@ Not checked against any endpoint; recorded only. What it means for Flopstar:
   import the spend key into it**: the key stays in the keystore and signs only through
   `FlopPolicy`.
 
+### Send-to-specific-miner guide (read 27 Nov, ~20:00 UTC)
+
+`https://ask.flop.finance/docs/send-to-specific-miner`, marked "devnet · next · development",
+last updated 26 Nov. **It doesn't unblock S3:**
+
+- **No endpoint discovery.** The guide assumes you already know the miner's SS58 account and can
+  reach its session endpoint: either the miner host's loopback `http://127.0.0.1:8645` or "a
+  miner's opted-in public HTTPS endpoint" (no URL or directory given). It says to "obtain a
+  calibrated, opted-in endpoint before signing". Public agents without an endpoint need "the
+  gateway's separate miner-pin path", which it doesn't explain. Offer discovery uses an indexer
+  (`FLOP_INDEXER_URL`; the SDK example uses `https://explorer.devnet.flop.network`). It also
+  warns: "A healthy catalog … does not prove a serving miner is available."
+- **Devnet only.** It says nothing about testnet.
+- **Its command matches our CLI wrapper**: `flop --network devnet --keystore … --password-env …
+  session run --miner <ss58> --model … --prompt … --max-flop 0.01 --via auto --endpoint … --json`
+  (`--via auto|offer|force`). So once we have an endpoint, `[<net>.miners]` is the only missing
+  piece. Don't use `flop chat` (HTLC path, a different thing) or `--new-wallet` (an unencrypted
+  wallet).
+- **The escrow is the bill**: "`--max-flop` … is what the session costs"; unused capacity isn't
+  refunded on a cooperative settle, and fees are extra. That matches what we found on 4 Nov. The
+  force-open minimum in its example is about 0.0072 FLOP, below our 0.05 floor.
+- **Gateway allowance**: "Gateway-funded access has separate quota, model scope and expiry;
+  faucet money does not replenish it" (details at `/docs/agent-integration#gateway-allowance-and-wallet-funds`,
+  not read yet).
+
 ## Launch announcement (FLOP Labs, 23 Nov)
 
 FLOP Labs' last post before launch, as the owner relayed it (verbatim):
