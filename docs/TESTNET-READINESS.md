@@ -349,6 +349,32 @@ last updated 26 Nov. **It doesn't unblock S3:**
   faucet money does not replenish it" (details at `/docs/agent-integration#gateway-allowance-and-wallet-funds`,
   not read yet).
 
+### Agent-integration and agent-onboarding guides (read 27 Nov, ~20:10 UTC)
+
+`https://ask.flop.finance/docs/agent-integration` (last updated 20 Nov) and `/docs/agent-onboarding`
+(14 Nov), both marked "devnet · next · development". **They don't unblock S3 or S4:**
+
+- **No miner-pin route.** Neither page describes the gateway's "miner-pin path" that the
+  send-to-specific-miner guide mentions. Offers are found through an indexer (`FLOP_INDEXER_URL`;
+  MCP `flop_list_session_offers`), expire after ten minutes and are single-use. Miners publish them
+  only if they opt in (`SESSION_OFFER_INDEXER_URL`). There is no general miner directory.
+- **Gateway access is issuer-controlled.** The gateway is `https://api.flop.network` (devnet).
+  "Only the gateway issuer can approve additional access". The public wallet lane needs "an
+  explicitly configured operator quota; there is no default grant amount". The only contact route
+  is a GitHub issue on `flop-labs/network`, "not a required enrollment step or a guaranteed
+  allowance" (issue #6 tracks restoring an allowance). "Public Devnet agent access is separate from
+  planned Testnet." Credentials last at most 24 h (`GET /v1/keys/me` returns `remaining_quota` in
+  FLOP and `expires_at`).
+- **A gateway allowance wouldn't spend our faucet FLOP.** "A gateway allowance spends the gateway
+  broker's funds and does not add FLOP to your wallet", and "faucet money does not replenish it".
+  So even with a gateway key, the 10 FLOP in the spend account would stay unspent, and the
+  `agent_spend_missing` refill rule wants a spend of the last grant. Only a direct session paid
+  from our own escrow (S3) clears that.
+- **Out of date on testnet:** onboarding still calls 24 Nov a target. Neither page says testnet
+  inference works or covers the agent's own-wallet x402 / payment-proof route.
+- Key warnings match our rules: never put credentials or private keys in an access issue (public
+  address, timestamp and error code only); keep bearer keys private.
+
 ## Launch announcement (FLOP Labs, 23 Nov)
 
 FLOP Labs' last post before launch, as the owner relayed it (verbatim):
