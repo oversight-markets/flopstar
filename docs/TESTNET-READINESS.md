@@ -238,6 +238,68 @@ droplet with the blocker-2 procedure:
   read-only `health` on testnet (`connected: true`, chain "FLOP Testnet") and `balance` of the
   spend account on testnet (0) and devnet (25 FLOP). Peak container memory 177 MiB.
 
+## Day 4 (FLOP Labs, 27 Nov; checked 12:10 UTC)
+
+FLOP Labs' post, as the owner relayed it (verbatim):
+
+> Flop Network Testnet, November 27.
+>
+> - About 2.1 million wallets created
+> - Outside miners can now join, and about 450 have registered. See the Testnet FAQ on http://docs.flop.network
+> - GPU capacity equal to about 230 H100 cards, and 8 models registered
+> - Testnet model prices were too high, now corrected
+> - Validators can run the host check and queue up
+> - Agent faucet refills on a rolling 24 hours. No allowance? Try again.
+> - New GPU provider directory on http://flop.finance
+>
+> Next
+> - Faster validator onboarding after an upgrade. Update your command line tool now.
+> - Vouchers. They are not switched on yet.
+> - Simpler guides for agents on spending test tokens
+> - A signed miner pack
+>
+> Claiming is only step one. Holding test $ FLOP earns nothing and the GPUs are ready, so put your
+> agent to work.
+
+Checked (read-only GETs; nothing signed or posted). Still blocked on S3/S4: no miner endpoint to
+send to, and no way to get a testnet gateway key.
+
+- **CLI:** `releases.json` still names `cli` v0.1.505 (the image digest we pinned on 26 Nov), so
+  the pin is current. "Update your command line tool" is for validators. `miner-worker` is at
+  0.1.520.
+- **Prices:** the testnet catalog (`gateway.testnet.flop.network/v1/models`) lists 8 models,
+  model-wide `pricing` still `"0"`. qwen3-8b has 132 live price sources, each
+  `flop_per_gn` 0.00000002 × `gn_per_*_token` 17 = **0.00000034 FLOP/token**, the same as on
+  26 Nov; others: qwen3-14b (93 sources, ×30), qwen3-4b (67, ×9), qwen3-1.7b (29, ×4). The
+  `min_escrow` floor of 0.05 FLOP still sets the escrow for any small ask. Price sources still
+  carry no endpoint (fields: `miner_address`, `version`, `source`, `effective_at`, `expires_at`,
+  `ratified_at`, `flop_per_gn`, `gn_per_*_token`, `flop_usd`, `rounding`).
+- **Gateway (S4):** `/openapi.json` still marks `/enroll/wallet` "Devnet only"; owner keys are
+  "issued through the gateway's controlled administration path", and owners mint child
+  credentials at `/keys/ephemeral`. It also lists `/connect/grants`, `/connect/options` and
+  `/connect/preflight` (bounded grants; preflight "without spending"), all behind an owner key.
+  Direct payment-proof settlement is "not enabled".
+- **Agent guide** (`https://flop.network/llms.txt`, linked from the Testnet FAQ): *"there is no
+  Testnet gateway and no registered Testnet model or miner, so Testnet inference does not work
+  yet."* That is behind the catalog, but nothing there gives an agent a route in. It points to
+  `https://ask.flop.finance/docs/send-to-specific-miner` for direct sessions (not read yet). It
+  also says "No released CLI command sends this claim yet", so our own claim client is still
+  needed.
+- **Faucet refill:** the guide's refusal list says `fix_request` with reason
+  `agent_spend_missing` *"means the next grant needs a finalized spend of the last one"*
+  (`/limits`: `agent.rolloverRequiresSpend: true`, cooldown 86,400 s). We have spent none of draw
+  6 (10 FLOP, landed 26 Nov 22:21 UTC), so the next claim, due from 27 Nov 22:21 UTC, will most
+  likely be refused. Don't run it before the first paid ask. `/limits` at 12:06 UTC:
+  `status: daily_cap_reached` (11M of 11M used, `nextFreeAt` 14:35 UTC); miner sponsorship
+  `automatic_full`, 546 sponsored miners active.
+- **Testnet FAQ** (`docs.flop.network/docs/testnet-and-timeline?network=testnet`, updated 24 Nov):
+  nothing on how agents spend. Clients `@flop-labs/sdk` ≥ 0.11.0 and `@flop-labs/cli` ≥ 0.8.3
+  (our CLI image bundles 0.9.1 / 0.12.1). Earning starts at an activation block of a future runtime
+  upgrade, not yet announced, with no backfill; vouchers and orders are still disabled.
+
+Next for Flopstar: read the send-to-specific-miner page for a way to discover miner endpoints;
+otherwise keep waiting for S3/S4. Expect another SDK/CLI re-pin when the voucher upgrade lands.
+
 ## Launch announcement (FLOP Labs, 23 Nov)
 
 FLOP Labs' last post before launch, as the owner relayed it (verbatim):
