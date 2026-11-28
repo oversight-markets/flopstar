@@ -21,6 +21,7 @@ def _mock_transport(
     catalog: bytes | dict | None = None,
     faucet_status: str = "open",
     rollover_requires_spend: bool = True,
+    wallet_enrollment_url: str | None = None,
 ) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -35,6 +36,11 @@ def _mock_transport(
                 return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": genesis})
         if url == scout.RELEASES_URL:
             return httpx.Response(200, json={"cli": {"image": cli_image, "version": "0.1.505"}})
+        if url.endswith("/v1"):
+            body = {"name": "FLOP Inference API"}
+            if wallet_enrollment_url:
+                body["wallet_enrollment"] = wallet_enrollment_url
+            return httpx.Response(200, json=body)
         if url.endswith("/models"):
             if isinstance(catalog, bytes):
                 return httpx.Response(200, content=catalog)
@@ -109,6 +115,7 @@ def test_scout_flags_runtime_cli_genesis_faucet_and_s3_signal(tmp_path, monkeypa
         cli_image="ghcr.io/flop-labs/flop-core/cli:v0.1.999@sha256:" + "11" * 32,
         catalog=catalog,
         faucet_status="daily_cap_reached",
+        wallet_enrollment_url="https://api.flop.network/v1/enroll/wallet/challenge",
     )
     report = scout.scout(cfg, policy, transport=transport, now=now)
 
@@ -116,11 +123,13 @@ def test_scout_flags_runtime_cli_genesis_faucet_and_s3_signal(tmp_path, monkeypa
     assert report["runtime"]["sdk_supported"] is False
     assert report["runtime"]["genesis_matches_pin"] is False
     assert report["cli_release"]["cli_drift"] is True
+    assert report["gateway_enrollment"]["enabled"] is True
     assert any(a.startswith("RUNTIME_DRIFT:") for a in alerts)
     assert any(a.startswith("GENESIS_MISMATCH:") for a in alerts)
     assert any(a.startswith("CLI_DRIFT:") for a in alerts)
     assert any(a.startswith("FAUCET_STATUS:") for a in alerts)
     assert any(a.startswith("S3_SIGNAL:") for a in alerts)
+    assert any(a.startswith("S4_SIGNAL:") for a in alerts)
     assert not cfg.kill_path.exists()  # read-only scout never trips KILL-flop
 
 

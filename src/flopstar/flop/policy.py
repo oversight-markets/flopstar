@@ -20,8 +20,9 @@ import subprocess
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
+from urllib.parse import urlparse
 
 from ..signer import PolicyViolation
 from .amounts import format_flop
@@ -40,6 +41,7 @@ class KillSwitchTripped(PolicyViolation):
 class ActionKind(StrEnum):
     FAUCET_DRAW = "faucet_draw"
     FAUCET_CLAIM = "faucet_claim"
+    GATEWAY_ENROLL = "gateway_enroll"
     INFERENCE = "inference"
     RECOVERY = "recovery"
     WALLET_FUND = "wallet_fund"
@@ -65,6 +67,67 @@ def agent_claim_message(genesis: str, address: str, nonce: str) -> str:
     if not re.fullmatch(r"[1-9A-HJ-NP-Za-km-z]{46,48}", address):
         raise PolicyViolation(f"claim address {address!r} is not an SS58 address")
     return f"{AGENT_CLAIM_PREFIX}|{genesis}|{address}|{nonce}"
+
+
+_ENROLL_NONCE_RE = re.compile(r"^Nonce: ([0-9a-f]{64})$")
+_ENROLL_MAX_TTL = timedelta(minutes=5)
+_ENROLL_MAX_SKEW = timedelta(seconds=30)
+
+
+def validate_gateway_enrollment_challenge(
+    message: str,
+    *,
+    address: str,
+    gateway_url: str,
+    genesis: str,
+    network: str,
+    now: datetime,
+) -> str:
+    """
+    Strictly validate the 8-line gateway wallet-enrollment challenge (@flop-labs/cli 0.10.4
+    `validateWalletEnrollmentChallenge`). Returns the 64-hex nonce; raises PolicyViolation
+    on any structural, host, genesis, address, or timestamp mismatch.
+    """
+    if not isinstance(message, str):
+        raise PolicyViolation("enrollment challenge must be a string")
+    if not re.fullmatch(r"0x[0-9a-f]{64}", genesis):
+        raise PolicyViolation(f"pinned genesis {genesis!r} is not lowercase 32-byte hex")
+    host = urlparse(gateway_url).netloc
+    if not host:
+        raise PolicyViolation(f"gateway_url {gateway_url!r} has no host")
+    lines = message.split("\n")
+    expected_header = (
+        f"{host} wants you to enroll a FLOP {network} gateway key with your account:"
+    )
+    if (
+        len(lines) != 8
+        or lines[0] != expected_header
+        or lines[1] != address
+        or lines[2] != ""
+        or lines[3] != f"Action: flop-{network}-enroll/v1"
+        or lines[4] != f"Genesis: {genesis}"
+    ):
+        raise PolicyViolation(f"{network} gateway returned an invalid enrollment challenge")
+    nonce_match = _ENROLL_NONCE_RE.fullmatch(lines[5])
+    if not nonce_match:
+        raise PolicyViolation(f"{network} gateway enrollment challenge has an invalid nonce")
+    if not lines[6].startswith("Issued At: ") or not lines[7].startswith("Expiration Time: "):
+        raise PolicyViolation(f"{network} gateway enrollment challenge lacks timestamps")
+    try:
+        issued = datetime.fromisoformat(lines[6].removeprefix("Issued At: "))
+        expires = datetime.fromisoformat(lines[7].removeprefix("Expiration Time: "))
+    except ValueError as e:
+        raise PolicyViolation(f"enrollment challenge timestamp invalid: {e}") from None
+    if issued.tzinfo is None or expires.tzinfo is None:
+        raise PolicyViolation("enrollment challenge timestamps must include timezone")
+    now_utc = now.astimezone(UTC)
+    if issued > now_utc + _ENROLL_MAX_SKEW:
+        raise PolicyViolation("enrollment challenge Issued At is in the future")
+    if expires <= now_utc:
+        raise PolicyViolation("enrollment challenge has already expired")
+    if expires <= issued or (expires - issued) > _ENROLL_MAX_TTL:
+        raise PolicyViolation("enrollment challenge lifetime exceeds 5 minutes")
+    return nonce_match.group(1)
 
 # Extrinsics FlopPolicy will sign, per action kind. Names checked against the devnet runtime
 # metadata (spec 1014003, docs/FLOP.md §2.4/§6). Kinds without an entry have no extrinsic path yet
@@ -273,6 +336,41 @@ class FlopPolicy:
             self._log({"kind": "signature", "action": kind, "draw_id": draw_id,
                        "signer": address, "message": message, "signature": sig_hex})
             return message, sig_hex
+
+    def sign_gateway_enrollment(self, keypair, message: str) -> str:
+        """
+        Sign a strictly validated 8-line gateway wallet-enrollment challenge with the spend key.
+        Returns `0x`-hex sr25519 signature. Never logs any resulting bearer key.
+        """
+        kind = ActionKind.GATEWAY_ENROLL
+        with self.guarded(f"{kind} signature"):
+            gateway_url = self.cfg.network.gateway_url
+            if not gateway_url:
+                raise PolicyViolation(f"{self.network} has no gateway_url configured")
+            genesis = self.cfg.require_pinned_genesis().lower()
+            address = keypair.ss58_address
+            nonce = validate_gateway_enrollment_challenge(
+                message,
+                address=address,
+                gateway_url=gateway_url,
+                genesis=genesis,
+                network=self.network,
+                now=self.now(),
+            )
+            payload = message.encode("utf-8")
+            signature = keypair.sign(payload)
+            if len(signature) != 64 or not keypair.verify(payload, signature):
+                raise RuntimeError("enrollment signature does not verify against the spend key")
+            sig_hex = "0x" + signature.hex()
+            self._log({
+                "kind": "signature",
+                "action": kind,
+                "signer": address,
+                "gateway": urlparse(gateway_url).netloc,
+                "nonce": nonce,
+                "signature": sig_hex,
+            })
+            return sig_hex
 
     # ---- recovery -----------------------------------------------------------------------------
 

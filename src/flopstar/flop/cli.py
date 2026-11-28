@@ -40,6 +40,9 @@ Dry run unless --post:
              [--json] [--post]
                                                  Living Changelog & Doc-vs-Code Watchtower (spends
                                                  nothing unless changes/contradictions + --post)
+  gateway enroll [--out PATH] [--rotate] [--json] [--post]
+                                                 Enroll encrypted spend account for a gateway key
+                                                 through FlopPolicy (dry run unless --post)
   recovery [--post]                    Find our channels with escrow to recover; submit the calls
   touchstone register [--post] [--chain-account SS58] | replay [--post]
 """
@@ -1170,12 +1173,66 @@ def run_watchtower(args: list[str]) -> None:
         sys.exit(1)
 
 
+def run_gateway(args: list[str]) -> None:
+    import argparse
+
+    from ..signer import PolicyViolation
+    from . import gateway_enroll
+    from .policy import KillSwitchTripped
+    from .wallet import WalletError, load_spend_keypair, spend_address
+
+    sub = args[0] if args else ""
+    if sub != "enroll":
+        print(USAGE, end="", file=sys.stderr)
+        sys.exit(1)
+
+    ap = argparse.ArgumentParser(prog="flopstar flop gateway enroll")
+    ap.add_argument("--out")
+    ap.add_argument("--rotate", action="store_true")
+    ap.add_argument("--json", action="store_true", dest="as_json")
+    ap.add_argument("--post", action="store_true")
+    a = ap.parse_args(args[1:])
+
+    cfg = _load()
+    policy = _policy(cfg)
+    address = spend_address(cfg)
+    out_path = Path(a.out) if a.out else None
+    view = gateway_enroll.plan(
+        cfg, policy, address, out_path=out_path, rotate=a.rotate, transport=HOOKS["transport"]
+    )
+    if not a.post:
+        if a.as_json:
+            print(json.dumps({**view, "dry_run": True}, indent=2, sort_keys=True))
+        else:
+            _print(view)
+            print("dry run: nothing signed or sent (add --post)")
+        return
+    if view["problems"]:
+        raise SystemExit("refused: " + "; ".join(view["problems"]))
+
+    def load():
+        return load_spend_keypair(cfg, HOOKS["passphrase"])
+
+    try:
+        with HOOKS["http"]() as client:
+            outcome = gateway_enroll.enroll(
+                cfg, policy, client, address, load, out_path=out_path, rotate=a.rotate
+            )
+    except (gateway_enroll.EnrollmentError, PolicyViolation, KillSwitchTripped, WalletError) as e:
+        raise SystemExit(f"refused: {e}") from None
+
+    if a.as_json:
+        print(json.dumps(outcome, indent=2, sort_keys=True))
+    else:
+        _print(outcome)
+
+
 def run_flop(args: list[str]) -> None:
     command, rest = (args[0] if args else ""), args[1:]
     handlers = {"config": run_config, "touchstone": run_touchstone, "status": run_status,
                 "scout": run_scout, "wallet": run_wallet, "faucet": run_faucet, "ask": run_ask,
                 "run": run_tasks, "audit": run_audit, "debate": run_debate,
-                "watchtower": run_watchtower, "recovery": run_recovery}
+                "watchtower": run_watchtower, "gateway": run_gateway, "recovery": run_recovery}
     if command not in handlers:
         print(USAGE, end="", file=sys.stderr)
         sys.exit(1)

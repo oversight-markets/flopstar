@@ -231,6 +231,32 @@ def _probe_faucet(client: httpx.Client, cfg: FlopConfig) -> tuple[dict, list[str
     }, alerts
 
 
+def _probe_gateway_enrollment(client: httpx.Client, cfg: FlopConfig) -> tuple[dict, list[str]]:
+    """Read-only GET {gateway_url} checking whether `wallet_enrollment` is enabled (S4)."""
+    alerts: list[str] = []
+    url = cfg.network.gateway_url
+    if not url:
+        return {"status": "unconfigured", "enabled": False}, []
+    data, _, err = _json_get(client, url)
+    if err or not isinstance(data, dict):
+        return {"status": "error", "enabled": False, "error": err or "non-object"}, []
+    expected = f"{url.rstrip('/')}/enroll/wallet/challenge"
+    advertised = data.get("wallet_enrollment")
+    enabled = isinstance(advertised, str) and advertised == expected
+    has_key = bool(cfg.gateway_key_file and cfg.gateway_key_file.exists())
+    if enabled and not has_key:
+        alerts.append(
+            f"S4_SIGNAL: {cfg.network.name} gateway wallet_enrollment is ENABLED ({advertised}); "
+            "run `flopstar flop gateway enroll` (dry run first)"
+        )
+    return {
+        "status": "ok",
+        "enabled": enabled,
+        "wallet_enrollment_url": advertised if isinstance(advertised, str) else None,
+        "local_gateway_key_present": has_key,
+    }, alerts
+
+
 def scout(cfg: FlopConfig, policy: FlopPolicy, *,
           transport: httpx.BaseTransport | None = None,
           now: datetime | None = None,
@@ -256,11 +282,13 @@ def scout(cfg: FlopConfig, policy: FlopPolicy, *,
         rt_view, rt_alerts = _probe_runtime(client, cfg)
         rel_view, rel_alerts = _probe_releases(client, cfg, releases_url)
         cat_view, cat_alerts = _probe_catalog(client, cfg, now)
+        gw_view, gw_alerts = _probe_gateway_enrollment(client, cfg)
         fau_view, fau_alerts = _probe_faucet(client, cfg)
 
     alerts.extend(rt_alerts)
     alerts.extend(rel_alerts)
     alerts.extend(cat_alerts)
+    alerts.extend(gw_alerts)
     alerts.extend(fau_alerts)
 
     return {
@@ -276,6 +304,7 @@ def scout(cfg: FlopConfig, policy: FlopPolicy, *,
         "runtime": rt_view,
         "cli_release": rel_view,
         "catalog": cat_view,
+        "gateway_enrollment": gw_view,
         "faucet": fau_view,
         "alerts": alerts,
     }
