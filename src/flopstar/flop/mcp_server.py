@@ -19,8 +19,8 @@ import hashlib
 from dataclasses import asdict
 from typing import Any
 
+from . import auditor, inference, recovery, scout
 from . import cli as flop_cli
-from . import inference, recovery, scout
 from .amounts import AmountError, format_flop, parse_flop
 from .config import ConfigError, FlopConfig, load_config
 from .ledger import Ledger
@@ -160,6 +160,74 @@ def tool_flop_check_recovery(cfg: FlopConfig | None = None, *, chain=None) -> di
     }
 
 
+def tool_flop_plan_audit(
+    *,
+    family: str = "precision-audit",
+    model: str | None = None,
+    miners: int = auditor.DEFAULT_MINER_COUNT,
+    context_kb: int = auditor.DEFAULT_CONTEXT_KB,
+    seed: str | None = None,
+    route: str = "direct",
+    cfg: FlopConfig | None = None,
+) -> dict[str, Any]:
+    """Dry-run cross-miner Truth Serum audit plan: probe preview, miners, and total escrow."""
+    resolved, policy = _context(cfg)
+    chosen_model = model or (
+        resolved.caps.allowed_models[0] if resolved.caps.allowed_models else None
+    )
+    if not chosen_model:
+        return {
+            "ok": False,
+            "dry_run": True,
+            "problems": ["no model specified and allowed_models is empty"],
+        }
+    try:
+        probe = auditor.generate_probe(family, seed=seed, context_kb=context_kb)
+    except ValueError as e:
+        return {"ok": False, "dry_run": True, "problems": [str(e)]}
+
+    problems: list[str] = []
+    selected: list[str] = []
+    if route == "direct":
+        try:
+            selected = auditor.select_audit_miners(resolved, policy.ledger, count=miners)
+        except ValueError as e:
+            problems.append(str(e))
+        if not selected and not problems:
+            problems.append(f"no usable miners in [{resolved.network.name}.miners] (SPEC S3)")
+    else:
+        selected = [None]  # type: ignore[list-item]
+
+    plans: list[dict[str, Any]] = []
+    total_escrow = 0
+    for m in selected:
+        p = flop_cli._sized_plan(
+            resolved, policy, route=route, model=chosen_model, prompt=probe.prompt,
+            purpose=f"audit:{probe.family}", max_tokens=probe.recommended_max_tokens,
+            miner=m, explicit=None,
+        )
+        raw = p.pop("_max_flop_raw", None)
+        if raw is not None:
+            total_escrow += raw
+        plans.append(p)
+
+    all_problems = problems + [
+        f"{p.get('miner') or route}: {msg}" for p in plans for msg in p.get("problems", [])
+    ]
+    return {
+        "ok": len(all_problems) == 0,
+        "dry_run": True,
+        "network": resolved.network.name,
+        "model": chosen_model,
+        "route": route,
+        "probe": probe.describe(),
+        "miners": selected,
+        "total_escrow": format_flop(total_escrow),
+        "problems": all_problems,
+        "plans": plans,
+    }
+
+
 def tool_flop_enqueue_research(question: str, cfg: FlopConfig | None = None) -> dict[str, Any]:
     """Validate and enqueue a single non-duplicate research question into data/research-queue.txt."""
     resolved, _ = _context(cfg)
@@ -256,6 +324,28 @@ def build_server():
             return tool_flop_check_recovery()
         except ConfigError as e:
             return {"error": str(e)}
+
+    @server.tool()
+    def flop_plan_audit(
+        family: str = "precision-audit",
+        model: str | None = None,
+        miners: int = auditor.DEFAULT_MINER_COUNT,
+        context_kb: int = auditor.DEFAULT_CONTEXT_KB,
+        seed: str | None = None,
+        route: str = "direct",
+    ) -> dict[str, Any]:
+        """Dry-run cross-miner Truth Serum audit plan (probe preview, miners, total escrow)."""
+        try:
+            return tool_flop_plan_audit(
+                family=family,
+                model=model,
+                miners=miners,
+                context_kb=context_kb,
+                seed=seed,
+                route=route,
+            )
+        except ConfigError as e:
+            return {"ok": False, "dry_run": True, "problems": [str(e)]}
 
     @server.tool()
     def flop_enqueue_research(question: str) -> dict[str, Any]:

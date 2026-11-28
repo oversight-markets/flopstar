@@ -176,6 +176,21 @@ def test_tool_flop_scout_wrapper(tmp_path, monkeypatch):
     assert isinstance(view["alerts"], list)
 
 
+def test_tool_flop_plan_audit_dry_run(tmp_path, monkeypatch):
+    cfg, _, _, _ = make_full(tmp_path, monkeypatch)
+    cfg = _roomy(cfg)
+    create_spend_keystore(cfg, "correct horse battery staple")
+    monkeypatch.setitem(cli.HOOKS, "transport", catalog_transport())
+    monkeypatch.setitem(cli.HOOKS, "which", lambda n: "/usr/bin/docker" if n == "docker" else None)
+
+    plan = mcp_server.tool_flop_plan_audit(
+        family="precision-audit", model=MODEL, miners=2, context_kb=2, seed="mcp-1", cfg=cfg
+    )
+    assert plan["ok"] is True and plan["dry_run"] is True
+    assert plan["total_escrow"] == "0.1"
+    assert set(plan["miners"]) == {SERVING, MINER}
+
+
 def test_mcp_server_never_exposes_signing_or_spending():
     src = Path(mcp_server.__file__).read_text()
     forbidden = (

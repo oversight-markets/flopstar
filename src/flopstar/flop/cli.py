@@ -28,6 +28,10 @@ Dry run unless --post:
                                        public catalog price; max_flop_per_request is the ceiling
   run [--route direct|gateway] [--post]          Run the useful-work tasks (contest-digest,
                                                  ops-review, research-notes) within budget
+  audit [--family F] [--model M] [--miners N] [--context-kb K] [--seed S]
+        [--route direct|gateway] [--json] [--post]
+                                                 Blind cross-miner Truth Serum audit (dry run
+                                                 unless --post; logs anomalies to incidents.jsonl)
   recovery [--post]                    Find our channels with escrow to recover; submit the calls
   touchstone register [--post] [--chain-account SS58] | replay [--post]
 """
@@ -621,11 +625,145 @@ def run_scout(args: list[str]) -> None:
     _print(view)
 
 
+def run_audit(args: list[str]) -> None:
+    import argparse
+
+    from ..signer import expected_did
+    from . import auditor, inference
+
+    ap = argparse.ArgumentParser(prog="flopstar flop audit")
+    ap.add_argument("--family", choices=auditor.FAMILIES, default="precision-audit")
+    ap.add_argument("--model")
+    ap.add_argument("--miners", type=int, default=auditor.DEFAULT_MINER_COUNT)
+    ap.add_argument("--miner", action="append", dest="miner_list")
+    ap.add_argument("--context-kb", type=int, default=auditor.DEFAULT_CONTEXT_KB)
+    ap.add_argument("--seed")
+    ap.add_argument("--route", choices=inference.ROUTES, default="direct")
+    ap.add_argument("--max-tokens", type=int)
+    ap.add_argument("--max-flop")
+    ap.add_argument("--json", action="store_true", dest="as_json")
+    ap.add_argument("--post", action="store_true")
+    a = ap.parse_args(args)
+
+    cfg = _load()
+    policy = _policy(cfg)
+    model = a.model or (cfg.caps.allowed_models[0] if cfg.caps.allowed_models else None)
+    if not model:
+        raise SystemExit("no model specified and allowed_models is empty")
+    explicit = _flop_amount(a.max_flop) if a.max_flop is not None else None
+    try:
+        probe = auditor.generate_probe(a.family, seed=a.seed, context_kb=a.context_kb)
+    except ValueError as e:
+        raise SystemExit(f"bad audit option: {e}") from None
+    max_tokens = a.max_tokens or probe.recommended_max_tokens
+
+    problems: list[str] = []
+    miners: list[str] = []
+    if a.route == "direct":
+        try:
+            miners = auditor.select_audit_miners(
+                cfg, policy.ledger, count=a.miners, requested=a.miner_list
+            )
+        except ValueError as e:
+            problems.append(str(e))
+        if not miners and not problems:
+            problems.append(f"no usable miners in [{cfg.network.name}.miners] (SPEC S3)")
+        elif len(miners) < 2 and not problems:
+            problems.append(
+                f"cross-miner audit prefers >=2 independent miners (only {len(miners)} configured)"
+            )
+    else:
+        miners = [None]  # type: ignore[list-item]
+
+    plans: list[dict] = []
+    total_escrow = 0
+    for m in miners:
+        plan = _sized_plan(
+            cfg, policy, route=a.route, model=model, prompt=probe.prompt,
+            purpose=f"audit:{probe.family}", max_tokens=max_tokens, miner=m, explicit=explicit,
+        )
+        raw_escrow = plan.pop("_max_flop_raw")
+        if raw_escrow is not None:
+            total_escrow += raw_escrow
+        plan["_max_flop_raw"] = raw_escrow
+        plans.append(plan)
+
+    b = policy.budget()
+    if total_escrow > b.remaining_today:
+        problems.append(
+            f"total batch escrow {format_flop(total_escrow)} exceeds today's remaining "
+            f"{format_flop(b.remaining_today)}"
+        )
+    if len(plans) > b.requests_left_this_hour:
+        problems.append(
+            f"batch needs {len(plans)} requests but only {b.requests_left_this_hour} left this hour"
+        )
+
+    plan_view = {
+        "network": cfg.network.name,
+        "model": model,
+        "route": a.route,
+        "probe": probe.describe(),
+        "miners": miners,
+        "total_escrow": format_flop(total_escrow),
+        "problems": problems + [
+            f"{p.get('miner') or a.route}: {msg}"
+            for p in plans for msg in p.get("problems", [])
+        ],
+        "plans": [{k: v for k, v in p.items() if k != "_max_flop_raw"} for p in plans],
+    }
+
+    if not a.post:
+        if a.as_json:
+            print(json.dumps({**plan_view, "dry_run": True}, indent=2, sort_keys=True))
+        else:
+            _print(plan_view)
+            print("dry run: nothing sent (add --post)")
+        return
+
+    if plan_view["problems"]:
+        raise SystemExit("refused: " + "; ".join(plan_view["problems"]))
+
+    passphrase = HOOKS["passphrase"]
+    if a.route == "direct" and passphrase is None:
+        from .wallet import read_passphrase
+        passphrase = read_passphrase(cfg)
+
+    runs: list[auditor.MinerRun] = []
+    for p in plans:
+        miner_addr = p.get("miner")
+        result = inference.execute(
+            cfg, policy, route=a.route, model=model, prompt=probe.prompt,
+            purpose=f"audit:{probe.family}", max_flop=p["_max_flop_raw"],
+            max_tokens=max_tokens, miner=miner_addr, passphrase=passphrase,
+            runner=HOOKS["runner"], which=_which(), transport=HOOKS["transport"],
+        )
+        result.touchstone = inference.report(
+            cfg, policy.ledger, result, agent_did=expected_did(),
+            cli_version=p.get("cli"), transport=HOOKS["transport"],
+        )
+        ver = auditor.verify_reply(probe, result.reply)
+        runs.append(auditor.MinerRun(miner=miner_addr or a.route, result=result, verification=ver))
+
+    analysis = auditor.analyze_batch(cfg, model, probe, runs)
+    incidents_file = auditor.record_incidents(cfg, analysis)
+    report_file = auditor.write_audit_report(cfg, analysis)
+    out = {
+        **auditor.analysis_to_dict(analysis),
+        "report_path": str(report_file),
+        "incidents_path": str(incidents_file) if incidents_file else None,
+    }
+    if a.as_json:
+        print(json.dumps(out, indent=2, sort_keys=True))
+    else:
+        _print(out)
+
+
 def run_flop(args: list[str]) -> None:
     command, rest = (args[0] if args else ""), args[1:]
     handlers = {"config": run_config, "touchstone": run_touchstone, "status": run_status,
                 "scout": run_scout, "wallet": run_wallet, "faucet": run_faucet, "ask": run_ask,
-                "run": run_tasks, "recovery": run_recovery}
+                "run": run_tasks, "audit": run_audit, "recovery": run_recovery}
     if command not in handlers:
         print(USAGE, end="", file=sys.stderr)
         sys.exit(1)

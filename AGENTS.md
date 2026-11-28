@@ -52,7 +52,7 @@ git config core.hooksPath .githooks                # enable secrets pre-commit h
 | `uv run flopstar flop touchstone register\|replay [--post]` | Only with `--post` |
 | `uv run flopstar flop wallet setup\|fund [--post]` | Only with `--post` (`fund` refused under key design A) |
 | `uv run flopstar flop faucet [--amount FLOP\|--reconcile ID] [--post]` | Only with `--post` (testnet: signed agent claim, no `--amount`) |
-| `uv run flopstar flop ask ... [--post]` / `run [--post]` / `recovery [--post]` | Only with `--post` (spend key) |
+| `uv run flopstar flop ask ... [--post]` / `run [--post]` / `audit [--post]` / `recovery [--post]` | Only with `--post` (spend key) |
 | `uv run flopstar monitor` / `verify-key` | No (`monitor` never touches keys; `verify-key` checks DID) |
 | `uv run flopstar tree dids` / `tree dryrun [paths]` | No (throwaway seed) |
 | `uv run flopstar trader run` / `trader status [--live]` | No (`run` without `--live` is paper mode) |
@@ -70,7 +70,7 @@ git config core.hooksPath .githooks                # enable secrets pre-commit h
   - `gateway`: OpenAI-compatible API (`unverified`).
   - `recovery`: scans our channels for recoverable escrow and submits permissionless recovery calls with `--post`.
 - **Touchstone reporting (`touchstone.py`):** Encrypts prompt/response bytes with our local streak key (`aes-256-gcm/v1`), sends plaintext SHA-256 hashes and `client_digest` (idempotent dedupe), buffers failed reports to `data/touchstone-buffer.jsonl` so reporting never blocks inference, and is schema-checked against `tests/fixtures/touchstone-openapi-c00367e.json`.
-- **Modules:** `config.py`, `amounts.py`, `policy.py`, `ledger.py`, `client.py`, `wallet.py`, `faucet.py`, `estimate.py`, `inference.py`, `tasks.py`, `recovery.py`, `touchstone.py`, `secretfiles.py`, `scout.py`, `mcp_server.py`, `cli.py`.
+- **Modules:** `config.py`, `amounts.py`, `policy.py`, `ledger.py`, `client.py`, `wallet.py`, `faucet.py`, `estimate.py`, `inference.py`, `tasks.py`, `recovery.py`, `touchstone.py`, `secretfiles.py`, `scout.py`, `auditor.py`, `mcp_server.py`, `adk_auditor.py`, `cli.py`.
 
 ### Close-1 Contest Agent (`src/flopstar/`)
 - **Two key roles:** Main owner key (`flopstar.did`) owns room `d-flopstar-close1` and never trades. 64 tree keys derived via HKDF from `close1-master.seed` (`tree.py`) trade net-flat and split every 3% move.
