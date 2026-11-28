@@ -8,10 +8,28 @@ channel on chain.
 Use it as a working reference for building your own FLOP agent that reports to Touchstone: capped
 spending, dry-run-by-default commands, an append-only ledger and an exact Touchstone client.
 
-> **Status (23 Nov 2026).** Ready for FLOP **testnet** (live 24 Nov, 07:00 UTC). Pinned to
-> `flop-sdk` 0.3.4 and FLOP CLI image `v0.1.455`, both checked against devnet runtime 1014034.
-> Testnet is refused until its genesis is pinned from FLOP's launch pages. Flopstar is registered
-> with Touchstone. It spends nothing until a miner endpoint or gateway key is reachable.
+> **Status (28 Nov 2026).** On FLOP **testnet** (`flop-sdk==0.4.1`, FLOP CLI image `v0.1.505`),
+> funded with 10 testnet FLOP and registered with Touchstone. Currently parked during the unscored
+> opening while waiting on `flop-sdk` / CLI support for runtime `1014040` and live testnet
+> gateway wallet enrollment (`GATEWAY_WALLET_ENROLL`) or direct miner endpoints.
+
+## Alignment with FLOP Labs & Network Security
+
+Flopstar is built to be **fully aligned with the FLOP Labs team** and the long-term security,
+reliability, and transparency of the FLOP Network:
+
+- **Fair play & genuine demand:** One identity, one capped spend account, strict
+  `same_control_miners` enforcement (independent demand only), prompt deduplication, and
+  high-utility workloads—no Sybil splitting, no self-dealing, and no spam loops.
+- **Debugging & ecosystem tooling:** Flopstar includes read-only diagnostic and auditing modules
+  (`flop scout`, `flop watchtower`, `flop audit`) designed to catch runtime/SDK drift,
+  doc-vs-code mismatches, and miner or settlement anomalies, producing reproducible, secret-free
+  reports to help FLOP Labs debug and harden the network.
+- **Responsible security disclosure:** Any vulnerability discovered in FLOP Network's chain,
+  runtime, SDK, CLI, gateway, or faucet is reported **privately and responsibly to
+  `security@flop.finance`** (never exploited, never disclosed publicly before a fix). Non-security
+  bugs and integration issues are shared constructively with reproducible traces on
+  `flop-labs/network`. See [SECURITY.md](SECURITY.md).
 
 ## How it works
 
@@ -89,6 +107,7 @@ Touchstone registers), create your own spend keystore, and set your caps in the 
 # read-only
 uv run flopstar flop config [--json]
 uv run flopstar flop status
+uv run flopstar flop scout [--json]                    # drift & opportunity radar (runtime, CLI, catalog, faucet)
 uv run flopstar flop wallet address
 uv run flopstar flop touchstone status                 # settings, network path, backlog
 uv run flopstar flop touchstone check [--spec FILE]    # diff payloads against Touchstone's spec
@@ -99,6 +118,9 @@ uv run flopstar flop faucet [--post]
 uv run flopstar flop ask --model M --prompt TEXT --purpose NAME [--route direct|gateway]
     [--miner SS58] [--max-tokens N] [--max-flop FLOP] [--post]   # escrow defaults to the estimate
 uv run flopstar flop run [--post]                      # scheduled useful-work tasks, within budget
+uv run flopstar flop audit [--family F] [--post]       # blind cross-miner consistency & anomaly audit
+uv run flopstar flop debate --topic TEXT [--post]      # multi-model Red/Blue debate & study workflows
+uv run flopstar flop watchtower [--post]               # ecosystem changelog & doc-vs-code contradiction watcher
 uv run flopstar flop recovery [--post]                 # recover escrow from our stuck channels
 uv run flopstar flop touchstone register [--post]      # register your DID + spend account
 uv run flopstar flop touchstone replay [--post]        # resend buffered reports
@@ -185,6 +207,11 @@ src/flopstar/flop/
 ├── recovery.py    permissionless channel recovery
 ├── touchstone.py  Touchstone wire schema, aes-256-gcm/v1, buffered reporting
 ├── secretfiles.py owner-only files and systemd credentials
+├── scout.py       read-only runtime/CLI/catalog/faucet drift radar
+├── auditor.py     cross-miner consistency & anomaly auditor (`data/incidents.jsonl`)
+├── debate.py      multi-model Red/Blue decision & study workflows
+├── watchtower.py  ecosystem snapshot diff & doc-vs-code contradiction watcher
+├── mcp_server.py  read-only / plan-only local FastMCP server
 └── cli.py         `flopstar flop ...`
 deploy/            systemd units and timers, flop.example.toml
 docs/FLOP.md       design, protocol facts with sources, open questions, go-live sequence
@@ -193,7 +220,7 @@ docs/FLOP.md       design, protocol facts with sources, open questions, go-live 
 ## Development
 
 ```bash
-uv run pytest -q          # 258 tests; throwaway keys, mocked network, fake CLI
+uv run pytest -q          # 320 tests; throwaway keys, mocked network, fake CLI
 uv run ruff check
 git config core.hooksPath .githooks   # secrets pre-commit hook
 ```
@@ -210,7 +237,7 @@ code is still in `src/flopstar/` and documented in [docs/TREE.md](docs/TREE.md),
 ## References
 
 - [FLOP docs](https://docs.flop.network) and [SDK references](https://docs.flop.network/docs/sdk-references)
-- [flop-sdk on PyPI](https://pypi.org/project/flop-sdk/) (pinned `==0.3.4`)
+- [flop-sdk on PyPI](https://pypi.org/project/flop-sdk/) (pinned `==0.4.1`)
 - [FLOP Network Releases](https://github.com/flop-labs/network/releases) - recommended by FLOP Labs for keeping up to date with FLOP
 
 ## License and author
