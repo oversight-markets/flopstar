@@ -77,9 +77,9 @@ BUILTIN_PROFILES = {
     ),
     # Live 24 Nov 2026 07:00 UTC. FLOP's testnet page (flop.network/testnet) publishes the wss RPC
     # and this genesis; checked on 24 Nov against chain_getBlockHash(0) on both the wss and the
-    # HTTPS endpoint (specName flop-testnet, spec 1014035). The faucet took over
-    # faucet.flop.network on 25 Nov (its /chain reports this genesis); the gateway host below is
-    # still an unpublished guess that doesn't resolve.
+    # HTTPS endpoint (specName flop-testnet, spec 1014035; 1014039 by 26 Nov). The faucet took
+    # over faucet.flop.network on 25 Nov (its /chain reports this genesis); gateway_url below
+    # resolved on 26 Nov and serves /v1/models with per-miner FLOP prices (no public key enrollment).
     "testnet": NetworkProfile(
         name="testnet",
         rpc_url="wss://testnet.flop.network",

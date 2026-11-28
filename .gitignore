@@ -7,9 +7,10 @@
 !.env.example
 secrets/
 
-# Data and evidence
+# Data, evidence, and personal research
 evidence/
 data/
+research/
 *.sqlite
 *.sqlite3
 *.db

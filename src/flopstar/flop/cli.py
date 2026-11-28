@@ -12,6 +12,7 @@ USAGE = """Usage: flopstar flop <command>
 Read-only:
   config [--json]                      Resolved network profile, caps and paths
   status                               Chain health, genesis check, accounts, balances, budget
+  scout [--json]                       Drift & opportunity radar (runtime, CLI pin, catalog, faucet)
   wallet address                       Our identity and spend accounts (public)
   touchstone status | check [--spec F] Touchstone settings, backlog, schema diff
 
@@ -608,11 +609,23 @@ def run_recovery(args: list[str]) -> None:
         print(json.dumps(done, sort_keys=True))
 
 
+def run_scout(args: list[str]) -> None:
+    from . import scout
+
+    cfg = _load()
+    policy = _policy(cfg)
+    view = scout.scout(cfg, policy, transport=HOOKS["transport"])
+    if "--json" in args:
+        print(json.dumps(view, indent=2, sort_keys=True))
+        return
+    _print(view)
+
+
 def run_flop(args: list[str]) -> None:
     command, rest = (args[0] if args else ""), args[1:]
     handlers = {"config": run_config, "touchstone": run_touchstone, "status": run_status,
-                "wallet": run_wallet, "faucet": run_faucet, "ask": run_ask, "run": run_tasks,
-                "recovery": run_recovery}
+                "scout": run_scout, "wallet": run_wallet, "faucet": run_faucet, "ask": run_ask,
+                "run": run_tasks, "recovery": run_recovery}
     if command not in handlers:
         print(USAGE, end="", file=sys.stderr)
         sys.exit(1)
