@@ -19,7 +19,7 @@ import hashlib
 from dataclasses import asdict
 from typing import Any
 
-from . import auditor, debate, inference, recovery, scout
+from . import auditor, debate, inference, recovery, scout, watchtower
 from . import cli as flop_cli
 from .amounts import AmountError, format_flop, parse_flop
 from .config import ConfigError, FlopConfig, load_config
@@ -298,6 +298,28 @@ def tool_flop_plan_debate(
     }
 
 
+def tool_flop_watchtower_diff(
+    cfg: FlopConfig | None = None,
+    *,
+    transport=None,
+) -> dict[str, Any]:
+    """Read-only Watchtower snapshot delta and deterministic doc-vs-code contradiction check."""
+    resolved, policy = _context(cfg)
+    prev = watchtower.load_previous_snapshot(resolved)
+    curr = watchtower.collect_snapshot(resolved, policy, transport=transport)
+    diff = watchtower.diff_snapshots(prev, curr)
+    contradictions = watchtower.detect_contradictions(curr)
+    return {
+        "dry_run": True,
+        "network": resolved.network.name,
+        "collected_at": curr["collected_at"],
+        "packages": curr["packages"],
+        "diff": diff.describe(),
+        "contradictions": contradictions,
+        "alerts": (curr.get("scout") or {}).get("alerts") or [],
+    }
+
+
 def tool_flop_enqueue_research(question: str, cfg: FlopConfig | None = None) -> dict[str, Any]:
     """Validate and enqueue a single non-duplicate research question into data/research-queue.txt."""
     resolved, _ = _context(cfg)
@@ -438,6 +460,14 @@ def build_server():
             )
         except ConfigError as e:
             return {"ok": False, "dry_run": True, "problems": [str(e)]}
+
+    @server.tool()
+    def flop_watchtower_diff() -> dict[str, Any]:
+        """Read-only Watchtower snapshot delta and doc-vs-code contradiction check."""
+        try:
+            return tool_flop_watchtower_diff()
+        except ConfigError as e:
+            return {"dry_run": True, "error": str(e)}
 
     @server.tool()
     def flop_enqueue_research(question: str) -> dict[str, Any]:

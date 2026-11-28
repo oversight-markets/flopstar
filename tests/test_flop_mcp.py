@@ -216,6 +216,16 @@ def test_tool_flop_plan_debate_dry_run_and_secret_refusal(tmp_path, monkeypatch)
     assert ok["spec"]["planned_turns"] == 3
 
 
+def test_tool_flop_watchtower_diff_read_only(tmp_path, monkeypatch):
+    cfg, _, _, _ = make_full(tmp_path, monkeypatch)
+    transport = httpx.MockTransport(lambda req: httpx.Response(503, json={"error": "down"}))
+    view = mcp_server.tool_flop_watchtower_diff(cfg, transport=transport)
+    assert view["dry_run"] is True
+    assert view["network"] == "devnet"
+    assert view["diff"]["is_baseline"] is True
+    assert not (cfg.data_dir / "watchtower").exists()
+
+
 def test_mcp_server_never_exposes_signing_or_spending():
     src = Path(mcp_server.__file__).read_text()
     forbidden = (

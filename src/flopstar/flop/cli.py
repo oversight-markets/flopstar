@@ -36,6 +36,10 @@ Dry run unless --post:
          [--route direct|gateway] [--max-tokens N] [--json] [--post]
                                                  Multi-model Red/Blue Debate Arena or GEAR Study
                                                  Coach (dry run unless --post)
+  watchtower [--force] [--save-snapshot] [--route direct|gateway] [--max-tokens N]
+             [--json] [--post]
+                                                 Living Changelog & Doc-vs-Code Watchtower (spends
+                                                 nothing unless changes/contradictions + --post)
   recovery [--post]                    Find our channels with escrow to recover; submit the calls
   touchstone register [--post] [--chain-account SS58] | replay [--post]
 """
@@ -960,12 +964,218 @@ def run_debate(args: list[str]) -> None:
         sys.exit(1)
 
 
+def run_watchtower(args: list[str]) -> None:
+    import argparse
+    from datetime import UTC, datetime
+
+    from ..signer import expected_did
+    from . import inference, watchtower
+
+    ap = argparse.ArgumentParser(prog="flopstar flop watchtower")
+    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--save-snapshot", action="store_true")
+    ap.add_argument("--route", choices=inference.ROUTES, default="direct")
+    ap.add_argument("--miner")
+    ap.add_argument("--max-tokens", type=int, default=watchtower.DEFAULT_STAGE_MAX_TOKENS)
+    ap.add_argument("--max-flop")
+    ap.add_argument("--json", action="store_true", dest="as_json")
+    ap.add_argument("--post", action="store_true")
+    a = ap.parse_args(args)
+
+    cfg = _load()
+    policy = _policy(cfg)
+    explicit = _flop_amount(a.max_flop) if a.max_flop is not None else None
+    now = datetime.now(UTC)
+
+    prev = watchtower.load_previous_snapshot(cfg)
+    curr = watchtower.collect_snapshot(cfg, policy, transport=HOOKS["transport"], now=now)
+    diff = watchtower.diff_snapshots(prev, curr)
+    contradictions = watchtower.detect_contradictions(curr)
+    run_id = f"watchtower-{now:%Y%m%dT%H%M%SZ}"
+    should_run = a.force or diff.has_changes or bool(contradictions)
+
+    if a.save_snapshot and not a.post:
+        saved = watchtower.save_snapshot(cfg, curr)
+    else:
+        saved = None
+
+    stage_models: dict[str, str] = {}
+    problems: list[str] = []
+    plans: list[dict] = []
+    total_escrow = 0
+
+    if should_run:
+        try:
+            stage_models = watchtower.assign_stage_models(cfg.caps.allowed_models)
+        except ValueError as e:
+            problems.append(str(e))
+        if stage_models:
+            synth_prior: dict[str, str] = {}
+            for stage in watchtower.STAGES:
+                model = stage_models[stage]
+                prompt = watchtower.build_stage_prompt(
+                    stage, snapshot=curr, diff=diff, contradictions=contradictions,
+                    prior_outputs=synth_prior,
+                )
+                p = _sized_plan(
+                    cfg, policy, route=a.route, model=model, prompt=prompt,
+                    purpose=f"watchtower:{stage}", max_tokens=a.max_tokens,
+                    miner=a.miner, explicit=explicit,
+                )
+                raw = p.pop("_max_flop_raw")
+                if raw is not None:
+                    total_escrow += raw
+                p["_max_flop_raw"] = raw
+                p["stage"] = stage
+                plans.append(p)
+                synth_prior[stage] = "x" * (a.max_tokens * 4)
+
+            b = policy.budget()
+            if total_escrow > b.remaining_today:
+                problems.append(
+                    f"watchtower escrow {format_flop(total_escrow)} exceeds remaining "
+                    f"{format_flop(b.remaining_today)}"
+                )
+            if len(plans) > b.requests_left_this_hour:
+                problems.append(
+                    f"watchtower needs {len(plans)} requests but only {b.requests_left_this_hour} "
+                    "left this hour"
+                )
+            problems.extend(
+                f"{p['stage']}: {msg}" for p in plans for msg in p.get("problems", [])
+            )
+
+    plan_view = {
+        "run_id": run_id,
+        "network": cfg.network.name,
+        "route": a.route,
+        "snapshot_saved": str(saved) if saved else None,
+        "diff": diff.describe(),
+        "contradictions": contradictions,
+        "will_run_inference": should_run,
+        "stage_models": stage_models,
+        "worst_case_escrow": format_flop(total_escrow),
+        "problems": problems,
+        "stages": [{k: v for k, v in p.items() if k != "_max_flop_raw"} for p in plans],
+    }
+
+    if not a.post:
+        if a.as_json:
+            print(json.dumps({**plan_view, "dry_run": True}, indent=2, sort_keys=True))
+        else:
+            _print(plan_view)
+            print("dry run: nothing sent (add --post)")
+        return
+
+    if not should_run:
+        saved_path = watchtower.save_snapshot(cfg, curr)
+        view = {**plan_view, "snapshot_saved": str(saved_path), "skipped": True}
+        if a.as_json:
+            print(json.dumps(view, indent=2, sort_keys=True))
+        else:
+            _print(view)
+            print("no changes or contradictions detected: 0 FLOP spent")
+        return
+
+    if problems:
+        raise SystemExit("refused: " + "; ".join(problems))
+
+    passphrase = HOOKS["passphrase"]
+    if a.route == "direct" and passphrase is None:
+        from .wallet import read_passphrase
+        passphrase = read_passphrase(cfg)
+
+    prior_outputs: dict[str, str] = {}
+    stage_views: list[dict] = []
+    committed_raw = 0
+    error_msg: str | None = None
+
+    for stage in watchtower.STAGES:
+        model = stage_models[stage]
+        prompt = watchtower.build_stage_prompt(
+            stage, snapshot=curr, diff=diff, contradictions=contradictions,
+            prior_outputs=prior_outputs,
+        )
+        sized = _sized_plan(
+            cfg, policy, route=a.route, model=model, prompt=prompt,
+            purpose=f"watchtower:{stage}", max_tokens=a.max_tokens,
+            miner=a.miner, explicit=explicit,
+        )
+        raw_escrow = sized.pop("_max_flop_raw")
+        if sized["problems"] or raw_escrow is None:
+            error_msg = "; ".join(sized["problems"]) or f"{stage}: missing escrow"
+            break
+        result = inference.execute(
+            cfg, policy, route=a.route, model=model, prompt=prompt,
+            purpose=f"watchtower:{stage}", max_flop=raw_escrow,
+            max_tokens=a.max_tokens, miner=sized.get("miner") or a.miner,
+            passphrase=passphrase, runner=HOOKS["runner"], which=_which(),
+            transport=HOOKS["transport"],
+        )
+        result.touchstone = inference.report(
+            cfg, policy.ledger, result, agent_did=expected_did(),
+            cli_version=sized.get("cli"), transport=HOOKS["transport"],
+        )
+        committed_raw += result.max_flop
+        stage_views.append({
+            "stage": stage,
+            "model": model,
+            "status": result.status,
+            "verification": result.verification,
+            "max_flop": format_flop(result.max_flop),
+            "miner": result.miner,
+            "channel_id": result.channel_id,
+            "settle_tx": result.settle_tx,
+            "touchstone": result.touchstone,
+            "error": result.error,
+            "reply": result.reply,
+        })
+        if result.status != "settled":
+            error_msg = result.error or f"{stage} failed"
+            break
+        if result.reply:
+            prior_outputs[stage] = result.reply
+
+    outcome = watchtower.WatchtowerOutcome(
+        run_id=run_id,
+        created_at=now.isoformat(timespec="seconds"),
+        network=cfg.network.name,
+        has_changes=diff.has_changes,
+        forced=a.force,
+        contradictions=contradictions,
+        diff=diff.describe(),
+        stages=stage_views,
+        final_digest=prior_outputs.get("builder-digest"),
+        total_escrow_committed=format_flop(committed_raw),
+        completed=error_msg is None,
+        error=error_msg,
+    )
+    saved_snap = watchtower.save_snapshot(cfg, curr)
+    digest_path = watchtower.write_watchtower_digest(cfg, outcome)
+    inc_path = watchtower.record_watchtower_incidents(
+        cfg, contradictions, run_id=run_id, network=cfg.network.name, now=now
+    )
+    out = {
+        **watchtower.outcome_to_dict(outcome),
+        "snapshot_saved": str(saved_snap),
+        "digest_path": str(digest_path),
+        "incidents_path": str(inc_path) if inc_path else None,
+    }
+    if a.as_json:
+        print(json.dumps(out, indent=2, sort_keys=True))
+    else:
+        _print({k: v for k, v in out.items() if k != "stages"})
+        print(f"stages_executed: {len(stage_views)}  digest: {digest_path}")
+    if not outcome.completed:
+        sys.exit(1)
+
+
 def run_flop(args: list[str]) -> None:
     command, rest = (args[0] if args else ""), args[1:]
     handlers = {"config": run_config, "touchstone": run_touchstone, "status": run_status,
                 "scout": run_scout, "wallet": run_wallet, "faucet": run_faucet, "ask": run_ask,
                 "run": run_tasks, "audit": run_audit, "debate": run_debate,
-                "recovery": run_recovery}
+                "watchtower": run_watchtower, "recovery": run_recovery}
     if command not in handlers:
         print(USAGE, end="", file=sys.stderr)
         sys.exit(1)
