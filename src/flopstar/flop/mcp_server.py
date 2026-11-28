@@ -19,7 +19,7 @@ import hashlib
 from dataclasses import asdict
 from typing import Any
 
-from . import auditor, inference, recovery, scout
+from . import auditor, debate, inference, recovery, scout
 from . import cli as flop_cli
 from .amounts import AmountError, format_flop, parse_flop
 from .config import ConfigError, FlopConfig, load_config
@@ -228,6 +228,76 @@ def tool_flop_plan_audit(
     }
 
 
+def tool_flop_plan_debate(
+    *,
+    topic: str,
+    mode: str = "decision",
+    rounds: int = debate.DEFAULT_ROUNDS,
+    context_files: list[str] | None = None,
+    route: str = "direct",
+    max_tokens: int = debate.DEFAULT_TURN_MAX_TOKENS,
+    cfg: FlopConfig | None = None,
+) -> dict[str, Any]:
+    """Dry-run multi-model Red/Blue Debate or GEAR Study Coach plan (secret-checked)."""
+    resolved, policy = _context(cfg)
+    try:
+        spec = debate.build_spec(
+            resolved,
+            topic=topic,
+            mode=mode,
+            rounds=rounds,
+            context_files=context_files,
+            max_tokens=max_tokens,
+        )
+    except (ValueError, SecretInInput) as e:
+        return {"ok": False, "dry_run": True, "problems": [str(e)]}
+
+    seq = debate.planned_turn_sequence(spec)
+    synthetic_history: list[tuple[int, str, str, str]] = []
+    plans: list[dict[str, Any]] = []
+    total_escrow = 0
+    for rnum, role, model in seq:
+        prompt = debate.build_turn_prompt(spec, round_num=rnum, role=role, history=synthetic_history)
+        p = flop_cli._sized_plan(
+            resolved, policy, route=route, model=model, prompt=prompt,
+            purpose=f"debate:{spec.mode}:{role}", max_tokens=spec.max_tokens,
+            miner=None, explicit=None,
+        )
+        raw = p.pop("_max_flop_raw", None)
+        if raw is not None:
+            total_escrow += raw
+        p["round_num"] = rnum
+        p["role"] = role
+        plans.append(p)
+        synthetic_history.append((rnum, role, model, "x" * (spec.max_tokens * 4)))
+
+    problems = [
+        f"turn {i + 1} ({p['role']}): {msg}"
+        for i, p in enumerate(plans) for msg in p.get("problems", [])
+    ]
+    b = policy.budget()
+    if total_escrow > b.remaining_today:
+        problems.append(
+            f"worst-case escrow {format_flop(total_escrow)} exceeds remaining "
+            f"{format_flop(b.remaining_today)}"
+        )
+    if len(plans) > b.requests_left_this_hour:
+        problems.append(
+            f"debate needs up to {len(plans)} requests but only {b.requests_left_this_hour} "
+            "left this hour"
+        )
+    return {
+        "ok": len(problems) == 0,
+        "dry_run": True,
+        "network": resolved.network.name,
+        "route": route,
+        "spec": spec.describe(),
+        "worst_case_escrow": format_flop(total_escrow),
+        "problems": problems,
+        "turns": plans,
+    }
+
+
 def tool_flop_enqueue_research(question: str, cfg: FlopConfig | None = None) -> dict[str, Any]:
     """Validate and enqueue a single non-duplicate research question into data/research-queue.txt."""
     resolved, _ = _context(cfg)
@@ -343,6 +413,28 @@ def build_server():
                 context_kb=context_kb,
                 seed=seed,
                 route=route,
+            )
+        except ConfigError as e:
+            return {"ok": False, "dry_run": True, "problems": [str(e)]}
+
+    @server.tool()
+    def flop_plan_debate(
+        topic: str,
+        mode: str = "decision",
+        rounds: int = debate.DEFAULT_ROUNDS,
+        context_files: list[str] | None = None,
+        route: str = "direct",
+        max_tokens: int = debate.DEFAULT_TURN_MAX_TOKENS,
+    ) -> dict[str, Any]:
+        """Dry-run multi-model Red/Blue Debate or GEAR Study Coach plan."""
+        try:
+            return tool_flop_plan_debate(
+                topic=topic,
+                mode=mode,
+                rounds=rounds,
+                context_files=context_files,
+                route=route,
+                max_tokens=max_tokens,
             )
         except ConfigError as e:
             return {"ok": False, "dry_run": True, "problems": [str(e)]}

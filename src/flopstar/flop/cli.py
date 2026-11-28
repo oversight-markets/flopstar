@@ -32,6 +32,10 @@ Dry run unless --post:
         [--route direct|gateway] [--json] [--post]
                                                  Blind cross-miner Truth Serum audit (dry run
                                                  unless --post; logs anomalies to incidents.jsonl)
+  debate --topic TEXT [--mode decision|gear-coach] [--rounds 1..3] [--context-file FILE]...
+         [--route direct|gateway] [--max-tokens N] [--json] [--post]
+                                                 Multi-model Red/Blue Debate Arena or GEAR Study
+                                                 Coach (dry run unless --post)
   recovery [--post]                    Find our channels with escrow to recover; submit the calls
   touchstone register [--post] [--chain-account SS58] | replay [--post]
 """
@@ -759,11 +763,209 @@ def run_audit(args: list[str]) -> None:
         _print(out)
 
 
+def run_debate(args: list[str]) -> None:
+    import argparse
+    from datetime import UTC, datetime
+
+    from ..signer import expected_did
+    from . import debate, inference
+    from .tasks import SecretInInput
+
+    ap = argparse.ArgumentParser(prog="flopstar flop debate")
+    ap.add_argument("--topic", required=True)
+    ap.add_argument("--mode", choices=debate.MODES, default="decision")
+    ap.add_argument("--rounds", type=int, default=debate.DEFAULT_ROUNDS)
+    ap.add_argument("--context-file", action="append", dest="context_files")
+    ap.add_argument("--route", choices=inference.ROUTES, default="direct")
+    ap.add_argument("--miner")
+    ap.add_argument("--max-tokens", type=int, default=debate.DEFAULT_TURN_MAX_TOKENS)
+    ap.add_argument("--max-flop")
+    ap.add_argument("--json", action="store_true", dest="as_json")
+    ap.add_argument("--post", action="store_true")
+    a = ap.parse_args(args)
+
+    cfg = _load()
+    policy = _policy(cfg)
+    explicit = _flop_amount(a.max_flop) if a.max_flop is not None else None
+    try:
+        spec = debate.build_spec(
+            cfg,
+            topic=a.topic,
+            mode=a.mode,
+            rounds=a.rounds,
+            context_files=a.context_files,
+            max_tokens=a.max_tokens,
+        )
+    except (ValueError, SecretInInput) as e:
+        raise SystemExit(f"refused: {e}") from None
+
+    seq = debate.planned_turn_sequence(spec)
+    # Build worst-case snowballing dry-run plans (each prior turn adds ~4 bytes/token).
+    synthetic_history: list[tuple[int, str, str, str]] = []
+    plans: list[dict] = []
+    total_escrow = 0
+    for rnum, role, model in seq:
+        prompt = debate.build_turn_prompt(spec, round_num=rnum, role=role, history=synthetic_history)
+        plan = _sized_plan(
+            cfg, policy, route=a.route, model=model, prompt=prompt,
+            purpose=f"debate:{spec.mode}:{role}", max_tokens=spec.max_tokens,
+            miner=a.miner, explicit=explicit,
+        )
+        raw = plan.pop("_max_flop_raw")
+        if raw is not None:
+            total_escrow += raw
+        plan["_max_flop_raw"] = raw
+        plan["round_num"] = rnum
+        plan["role"] = role
+        plans.append(plan)
+        synthetic_history.append((rnum, role, model, "x" * (spec.max_tokens * 4)))
+
+    problems: list[str] = []
+    b = policy.budget()
+    if total_escrow > b.remaining_today:
+        problems.append(
+            f"worst-case debate escrow {format_flop(total_escrow)} exceeds today's remaining "
+            f"{format_flop(b.remaining_today)}"
+        )
+    if len(plans) > b.requests_left_this_hour:
+        problems.append(
+            f"debate needs up to {len(plans)} requests but only {b.requests_left_this_hour} "
+            "left this hour"
+        )
+    problems.extend(
+        f"turn {idx + 1} ({p['role']}): {msg}"
+        for idx, p in enumerate(plans) for msg in p.get("problems", [])
+    )
+
+    plan_view = {
+        "network": cfg.network.name,
+        "route": a.route,
+        "spec": spec.describe(),
+        "worst_case_escrow": format_flop(total_escrow),
+        "problems": problems,
+        "turns": [{k: v for k, v in p.items() if k != "_max_flop_raw"} for p in plans],
+    }
+
+    if not a.post:
+        if a.as_json:
+            print(json.dumps({**plan_view, "dry_run": True}, indent=2, sort_keys=True))
+        else:
+            _print(plan_view)
+            print("dry run: nothing sent (add --post)")
+        return
+
+    if problems:
+        raise SystemExit("refused: " + "; ".join(problems))
+
+    passphrase = HOOKS["passphrase"]
+    if a.route == "direct" and passphrase is None:
+        from .wallet import read_passphrase
+        passphrase = read_passphrase(cfg)
+
+    proposer, critic, synth = debate.mode_roles(spec.mode)
+    real_history: list[tuple[int, str, str, str]] = []
+    turn_views: list[dict] = []
+    committed_raw = 0
+    converged_early = False
+    error_msg: str | None = None
+    turn_idx = 0
+
+    def _run_one(rnum: int, role: str, model: str) -> tuple[inference.Result, bool]:
+        nonlocal turn_idx, committed_raw
+        turn_idx += 1
+        prompt = debate.build_turn_prompt(spec, round_num=rnum, role=role, history=real_history)
+        sized = _sized_plan(
+            cfg, policy, route=a.route, model=model, prompt=prompt,
+            purpose=f"debate:{spec.mode}:{role}", max_tokens=spec.max_tokens,
+            miner=a.miner, explicit=explicit,
+        )
+        raw_escrow = sized.pop("_max_flop_raw")
+        if sized["problems"] or raw_escrow is None:
+            raise SystemExit("refused mid-debate: " + "; ".join(sized["problems"]))
+        result = inference.execute(
+            cfg, policy, route=a.route, model=model, prompt=prompt,
+            purpose=f"debate:{spec.mode}:{role}", max_flop=raw_escrow,
+            max_tokens=spec.max_tokens, miner=sized.get("miner") or a.miner,
+            passphrase=passphrase, runner=HOOKS["runner"], which=_which(),
+            transport=HOOKS["transport"],
+        )
+        result.touchstone = inference.report(
+            cfg, policy.ledger, result, agent_did=expected_did(),
+            cli_version=sized.get("cli"), transport=HOOKS["transport"],
+        )
+        committed_raw += result.max_flop
+        conv = role == critic and debate.is_converged(result.reply)
+        turn_views.append({
+            "turn_index": turn_idx,
+            "round_num": rnum,
+            "role": role,
+            "model": model,
+            "status": result.status,
+            "verification": result.verification,
+            "max_flop": format_flop(result.max_flop),
+            "miner": result.miner,
+            "channel_id": result.channel_id,
+            "settle_tx": result.settle_tx,
+            "touchstone": result.touchstone,
+            "converged_signal": conv,
+            "error": result.error,
+            "reply": result.reply,
+        })
+        if result.status == "settled" and result.reply:
+            real_history.append((rnum, role, model, result.reply))
+        return result, conv
+
+    for rnum in range(1, spec.rounds + 1):
+        res_p, _ = _run_one(rnum, proposer, spec.role_models[proposer])
+        if res_p.status != "settled":
+            error_msg = res_p.error or f"turn {turn_idx} ({proposer}) failed"
+            break
+        res_c, conv = _run_one(rnum, critic, spec.role_models[critic])
+        if res_c.status != "settled":
+            error_msg = res_c.error or f"turn {turn_idx} ({critic}) failed"
+            break
+        if conv and rnum < spec.rounds:
+            converged_early = True
+            break
+
+    final_synthesis: str | None = None
+    if error_msg is None:
+        res_s, _ = _run_one(spec.rounds + 1, synth, spec.role_models[synth])
+        if res_s.status == "settled":
+            final_synthesis = res_s.reply
+        else:
+            error_msg = res_s.error or f"turn {turn_idx} ({synth}) failed"
+
+    outcome = debate.DebateOutcome(
+        debate_id=spec.debate_id,
+        created_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        network=cfg.network.name,
+        mode=spec.mode,
+        topic=spec.topic,
+        completed=error_msg is None,
+        converged_early=converged_early,
+        turns=turn_views,
+        final_synthesis=final_synthesis,
+        total_escrow_committed=format_flop(committed_raw),
+        error=error_msg,
+    )
+    report_path = debate.write_debate_report(cfg, outcome)
+    payload = {**debate.outcome_to_dict(outcome), "report_path": str(report_path)}
+    if a.as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        _print({k: v for k, v in payload.items() if k != "turns"})
+        print(f"turns_executed: {len(turn_views)}  report: {report_path}")
+    if not outcome.completed:
+        sys.exit(1)
+
+
 def run_flop(args: list[str]) -> None:
     command, rest = (args[0] if args else ""), args[1:]
     handlers = {"config": run_config, "touchstone": run_touchstone, "status": run_status,
                 "scout": run_scout, "wallet": run_wallet, "faucet": run_faucet, "ask": run_ask,
-                "run": run_tasks, "audit": run_audit, "recovery": run_recovery}
+                "run": run_tasks, "audit": run_audit, "debate": run_debate,
+                "recovery": run_recovery}
     if command not in handlers:
         print(USAGE, end="", file=sys.stderr)
         sys.exit(1)

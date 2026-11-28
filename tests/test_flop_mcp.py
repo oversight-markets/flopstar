@@ -191,6 +191,31 @@ def test_tool_flop_plan_audit_dry_run(tmp_path, monkeypatch):
     assert set(plan["miners"]) == {SERVING, MINER}
 
 
+def test_tool_flop_plan_debate_dry_run_and_secret_refusal(tmp_path, monkeypatch):
+    cfg, _, _, _ = make_full(tmp_path, monkeypatch)
+    cfg = _roomy(cfg)
+    create_spend_keystore(cfg, "correct horse battery staple")
+    monkeypatch.setitem(cli.HOOKS, "transport", catalog_transport())
+    monkeypatch.setitem(cli.HOOKS, "which", lambda n: "/usr/bin/docker" if n == "docker" else None)
+
+    bad = mcp_server.tool_flop_plan_debate(
+        topic="leak: -----BEGIN PRIVATE" + " KEY-----", cfg=cfg
+    )
+    assert bad["ok"] is False and bad["dry_run"] is True
+    assert any("PEM" in p for p in bad["problems"])
+
+    ok = mcp_server.tool_flop_plan_debate(
+        topic="Design ADK LoopAgent convergence rules",
+        mode="gear-coach",
+        rounds=1,
+        max_tokens=256,
+        cfg=cfg,
+    )
+    assert ok["ok"] is True and ok["dry_run"] is True
+    assert ok["worst_case_escrow"] == "0.15"
+    assert ok["spec"]["planned_turns"] == 3
+
+
 def test_mcp_server_never_exposes_signing_or_spending():
     src = Path(mcp_server.__file__).read_text()
     forbidden = (
